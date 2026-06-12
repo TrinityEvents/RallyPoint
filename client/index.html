@@ -14,8 +14,7 @@
     <meta name="description" content="RallyPoint — Sales event calendar. One Team. Every Event." />
 
     <!-- Icons -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-192.png" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
 
     <!-- PWA Manifest -->
@@ -28,7 +27,7 @@
 
     <title>RallyPoint</title>
 
-    <!-- Splash screen — shows instantly before React hydrates -->
+    <!-- Splash screen styles -->
     <style>
       #splash {
         position: fixed;
@@ -42,13 +41,13 @@
         transition: opacity 0.4s ease;
       }
       #splash.fade-out { opacity: 0; pointer-events: none; }
-      #splash svg { margin-bottom: 24px; }
       #splash .wordmark {
         font-family: Inter, system-ui, sans-serif;
         font-weight: 700;
         font-size: 32px;
         letter-spacing: -0.5px;
         color: white;
+        margin-top: 20px;
       }
       #splash .wordmark span { color: #00D4FF; }
       #splash .tagline {
@@ -86,26 +85,7 @@
     </div>
 
     <div id="root"></div>
-
     <script type="module" src="/src/main.tsx"></script>
-
-    <!-- Service Worker registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-      }
-      // Dismiss splash after app loads
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          const splash = document.getElementById('splash');
-          if (splash) {
-            splash.classList.add('fade-out');
-            setTimeout(() => splash.remove(), 400);
-          }
-        }, 800);
-      });
-    </script>
+    <script src="/pwa-init.js"></script>
   </body>
 </html>
