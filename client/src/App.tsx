@@ -21,91 +21,93 @@ function ThemeToggle() {
   return (
     <button
       onClick={() => setDark(!dark)}
-      className="p-2 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+      className="p-2 rounded-md text-white/50 hover:text-white hover:bg-white/10 transition-colors"
       data-testid="theme-toggle"
       aria-label="Toggle theme"
     >
-      {dark ? <Sun size={16} /> : <Moon size={16} />}
+      {dark ? <Sun size={15} /> : <Moon size={15} />}
     </button>
+  );
+}
+
+// RallyPoint logo SVG — starburst mark + wordmark
+function RallyPointLogo() {
+  return (
+    <div className="flex items-center gap-2.5">
+      {/* Starburst mark */}
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="RallyPoint logo mark">
+        <rect width="32" height="32" rx="8" fill="#0B132B"/>
+        {/* 6 nodes connected to center — people network / rally point */}
+        {/* Center dot */}
+        <circle cx="16" cy="16" r="2.5" fill="#2563FF"/>
+        {/* Top */}
+        <circle cx="16" cy="7" r="2" fill="#00D4FF"/>
+        <line x1="16" y1="9" x2="16" y2="13.5" stroke="#2563FF" strokeWidth="1.5" strokeLinecap="round"/>
+        {/* Top-right */}
+        <circle cx="23.5" cy="10.5" r="2" fill="#FF9F1C"/>
+        <line x1="21.9" y1="11.9" x2="18" y2="14.8" stroke="#FF9F1C" strokeWidth="1.5" strokeLinecap="round"/>
+        {/* Bottom-right */}
+        <circle cx="23.5" cy="21.5" r="2" fill="#FF5C7A"/>
+        <line x1="21.9" y1="20.1" x2="18" y2="17.2" stroke="#FF5C7A" strokeWidth="1.5" strokeLinecap="round"/>
+        {/* Bottom */}
+        <circle cx="16" cy="25" r="2" fill="#8B5CF6"/>
+        <line x1="16" y1="23" x2="16" y2="18.5" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round"/>
+        {/* Bottom-left */}
+        <circle cx="8.5" cy="21.5" r="2" fill="#FFD60A"/>
+        <line x1="10.1" y1="20.1" x2="14" y2="17.2" stroke="#FFD60A" strokeWidth="1.5" strokeLinecap="round"/>
+        {/* Top-left */}
+        <circle cx="8.5" cy="10.5" r="2" fill="#00D4FF"/>
+        <line x1="10.1" y1="11.9" x2="14" y2="14.8" stroke="#00D4FF" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+      {/* Wordmark */}
+      <div className="flex items-baseline gap-0">
+        <span className="text-white font-bold text-[17px] tracking-tight leading-none">Rally</span>
+        <span className="font-bold text-[17px] tracking-tight leading-none" style={{color:"#00D4FF"}}>Point</span>
+        {/* spark accent */}
+        <svg width="8" height="8" viewBox="0 0 8 8" className="ml-0.5 mb-1" style={{color:"#FFD60A"}}>
+          <path d="M4 0 L4.8 3.2 L8 4 L4.8 4.8 L4 8 L3.2 4.8 L0 4 L3.2 3.2 Z" fill="currentColor"/>
+        </svg>
+      </div>
+    </div>
   );
 }
 
 function Header() {
   const [location] = useLocation();
-  return (
-    <header className="trinity-header text-white shadow-lg">
-      <div className="max-w-5xl mx-auto px-4">
-        {/* Top bar */}
-        <div className="flex items-center justify-between py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <svg viewBox="0 0 32 32" width="28" height="28" aria-label="Trinity Staffing logo">
-                <rect x="4" y="4" width="24" height="24" rx="4" fill="hsl(183 50% 94% / 0.15)" stroke="white" strokeWidth="1.5"/>
-                <text x="16" y="22" textAnchor="middle" fontSize="16" fontWeight="700" fill="white" fontFamily="DM Sans, sans-serif">T</text>
-              </svg>
-              <div>
-                <div className="text-sm font-semibold leading-tight">Trinity Staffing</div>
-                <div className="text-xs text-white/60 leading-tight">Sales Mission</div>
-              </div>
-            </div>
-          </div>
-          <ThemeToggle />
-        </div>
 
-        {/* Nav tabs */}
-        <nav className="flex gap-1 -mb-px">
-          <Link href="/">
-            <a
-              data-testid="nav-upcoming"
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md transition-colors ${
-                location === "/" || location === ""
-                  ? "bg-background text-foreground"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <CalendarCheck size={15} />
-              Upcoming
-            </a>
-          </Link>
-          <Link href="/add">
-            <a
-              data-testid="nav-add"
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md transition-colors ${
-                location === "/add"
-                  ? "bg-background text-foreground"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Plus size={15} />
-              Add Event
-            </a>
-          </Link>
-          <Link href="/clipper">
-            <a
-              data-testid="nav-clipper"
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md transition-colors ${
-                location === "/clipper"
-                  ? "bg-background text-foreground"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Bookmark size={15} />
-              Clipper
-            </a>
-          </Link>
-          <Link href="/settings">
-            <a
-              data-testid="nav-settings"
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md transition-colors ${
-                location === "/settings"
-                  ? "bg-background text-foreground"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
-              }`}
-            >
-              <Settings size={15} />
-              Settings
-            </a>
-          </Link>
+  const navItem = (path: string, label: string, icon: React.ReactNode, match?: string) => {
+    const active = match ? location === match : location === path;
+    return (
+      <Link href={path}>
+        <a
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md transition-colors ${
+            active
+              ? "bg-background text-foreground"
+              : "text-white/55 hover:text-white hover:bg-white/8"
+          }`}
+        >
+          {icon}
+          {label}
+        </a>
+      </Link>
+    );
+  };
+
+  return (
+    <header className="rallypoint-header text-white shadow-xl">
+      <div className="max-w-5xl mx-auto px-4">
+        <div className="flex items-center justify-between py-3">
+          <RallyPointLogo />
+          <div className="flex items-center gap-1">
+            <span className="text-white/25 text-xs font-medium tracking-widest uppercase mr-2 hidden sm:block">Sales Mission</span>
+            <ThemeToggle />
+          </div>
+        </div>
+        <nav className="flex gap-0.5 -mb-px">
+          {navItem("/",        "Upcoming",  <CalendarCheck size={14} />, "/")}
+          {navItem("/add",     "Add Event", <Plus size={14} />)}
+          {navItem("/clipper", "Clipper",   <Bookmark size={14} />)}
+          {navItem("/settings","Settings",  <Settings size={14} />)}
         </nav>
       </div>
     </header>

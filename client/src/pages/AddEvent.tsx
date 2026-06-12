@@ -29,19 +29,19 @@ const formSchema = insertEventSchema.extend({
 type FormValues = z.infer<typeof formSchema>;
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
-  "Chamber":      "border-blue-300 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
-  "Networking":   "border-purple-300 bg-purple-50 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700",
-  "Job Fair":     "border-green-300 bg-green-50 text-green-800 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700",
-  "Trade Show":   "border-orange-300 bg-orange-50 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700",
-  "Client Visit": "border-teal-300 bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700",
-  "Other":        "border-gray-300 bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700",
+  "Chamber":      "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600",
+  "Networking":   "border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-600",
+  "Job Fair":     "border-cyan-400 bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-500",
+  "Trade Show":   "border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-500",
+  "Client Visit": "border-pink-400 bg-pink-50 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-500",
+  "Other":        "border-slate-400 bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600",
 };
 
 const ATTENDING_COLORS: Record<string, string> = {
-  "Ryan":      "border-blue-400 bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700",
-  "Connie":    "border-pink-400 bg-pink-50 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700",
-  "Both":      "border-teal-400 bg-teal-50 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300 dark:border-teal-700",
-  "Tentative": "border-amber-400 bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700",
+  "Ryan":      "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600",
+  "Connie":    "border-pink-500 bg-pink-50 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-600",
+  "Both":      "border-cyan-400 bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-500",
+  "Tentative": "border-yellow-400 bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-500",
 };
 
 function ToggleButton({
@@ -183,7 +183,7 @@ export default function AddEventPage() {
       <div className="mb-5">
         <h1 className="text-xl font-semibold text-foreground">Add Event</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Paste a URL to auto-fill, or enter details manually.
+          Paste a URL to auto-fill — or enter details manually.
         </p>
       </div>
 

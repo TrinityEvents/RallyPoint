@@ -4,7 +4,8 @@ import { events, type Event, type InsertEvent } from "@shared/schema";
 import { eq, desc, gte } from "drizzle-orm";
 import { resolve } from "path";
 
-const DB_PATH = resolve(process.cwd(), "data.db");
+// On Render: DATABASE_URL=/data/data.db (persistent disk). Locally: data.db in project root.
+const DB_PATH = process.env.DATABASE_URL || resolve(process.cwd(), "data.db");
 const sqlite = new Database(DB_PATH);
 const db = drizzle(sqlite);
 
