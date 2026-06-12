@@ -4,9 +4,21 @@ import { events, type Event, type InsertEvent } from "@shared/schema";
 import { eq, desc, gte } from "drizzle-orm";
 import { resolve } from "path";
 
-// Simple local DB - works on any platform
-const DB_PATH = resolve(process.cwd(), "data.db");
-console.log("[db] using path:", DB_PATH);
+// On Render: DATABASE_URL=/data/data.db (persistent disk) if disk is mounted.
+// Falls back to data.db in project root if /data dir doesn't exist (free tier).
+import { existsSync, mkdirSync } from "fs";
+function resolveDbPath(): string {
+  const envPath = process.env.DATABASE_URL;
+  if (envPath) {
+    const dir = envPath.substring(0, envPath.lastIndexOf("/"));
+    if (dir && !existsSync(dir)) {
+      try { mkdirSync(dir, { recursive: true }); } catch { /* fall through */ }
+    }
+    if (!dir || existsSync(dir)) return envPath;
+  }
+  return resolve(process.cwd(), "data.db");
+}
+const DB_PATH = resolveDbPath();
 const sqlite = new Database(DB_PATH);
 const db = drizzle(sqlite);
 
@@ -21,33 +33,33 @@ sqlite.exec(`
     end_time TEXT NOT NULL,
     location TEXT,
     source_url TEXT,
-    source_platform TEXT DEFAULT 'manual',
+    source_platform TEXT NOT NULL DEFAULT 'manual',
     source_text_snapshot TEXT,
-    added_by TEXT NOT NULL DEFAULT 'Ryan',
-    attending TEXT NOT NULL DEFAULT 'Ryan',
+    added_by TEXT NOT NULL,
+    attending TEXT NOT NULL,
     notes TEXT,
-    reminder_minutes INTEGER DEFAULT 60,
-    status TEXT DEFAULT 'upcoming',
+    reminder_minutes INTEGER,
+    status TEXT NOT NULL DEFAULT 'upcoming',
     outlook_web_link TEXT,
     graph_event_id TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
   )
 `);
 
 export interface IStorage {
-  getEvents(): Event[];
+  getAllEvents(): Event[];
   getUpcomingEvents(): Event[];
   getEventById(id: number): Event | undefined;
-  createEvent(event: InsertEvent): Event;
-  updateEvent(id: number, event: Partial<InsertEvent>): Event | undefined;
+  createEvent(data: InsertEvent): Event;
+  updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined;
   deleteEvent(id: number): boolean;
 }
 
-class SqliteStorage implements IStorage {
-  getEvents(): Event[] {
+export const storage: IStorage = {
+  getAllEvents(): Event[] {
     return db.select().from(events).orderBy(desc(events.eventDate)).all();
-  }
+  },
 
   getUpcomingEvents(): Event[] {
     const today = new Date().toISOString().split("T")[0];
@@ -55,25 +67,33 @@ class SqliteStorage implements IStorage {
       .where(gte(events.eventDate, today))
       .orderBy(events.eventDate)
       .all();
-  }
+  },
 
   getEventById(id: number): Event | undefined {
     return db.select().from(events).where(eq(events.id, id)).get();
-  }
+  },
 
-  createEvent(event: InsertEvent): Event {
-    return db.insert(events).values(event).returning().get();
-  }
+  createEvent(data: InsertEvent): Event {
+    const now = new Date().toISOString();
+    return db.insert(events).values({
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    }).returning().get();
+  },
 
-  updateEvent(id: number, event: Partial<InsertEvent>): Event | undefined {
-    return db.update(events).set({ ...event, updatedAt: new Date().toISOString() })
-      .where(eq(events.id, id)).returning().get();
-  }
+  updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined {
+    const now = new Date().toISOString();
+    const result = db.update(events)
+      .set({ ...data, updatedAt: now })
+      .where(eq(events.id, id))
+      .returning()
+      .get();
+    return result;
+  },
 
   deleteEvent(id: number): boolean {
     const result = db.delete(events).where(eq(events.id, id)).run();
     return result.changes > 0;
-  }
-}
-
-export const storage = new SqliteStorage();
+  },
+};
