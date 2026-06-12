@@ -1,32 +1,85 @@
-import { users } from '@shared/schema';
-import type { User, InsertUser } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
-import { eq } from "drizzle-orm";
+import { events, type Event, type InsertEvent } from "@shared/schema";
+import { eq, desc, gte } from "drizzle-orm";
+import { resolve } from "path";
 
-const sqlite = new Database("data.db");
-sqlite.pragma("journal_mode = WAL");
+const DB_PATH = resolve(process.cwd(), "data.db");
+const sqlite = new Database(DB_PATH);
+const db = drizzle(sqlite);
 
-export const db = drizzle(sqlite);
+// Create table if not exists
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    event_date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    location TEXT,
+    source_url TEXT,
+    source_platform TEXT NOT NULL DEFAULT 'manual',
+    source_text_snapshot TEXT,
+    added_by TEXT NOT NULL,
+    attending TEXT NOT NULL,
+    notes TEXT,
+    reminder_minutes INTEGER,
+    status TEXT NOT NULL DEFAULT 'upcoming',
+    outlook_web_link TEXT,
+    graph_event_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )
+`);
 
 export interface IStorage {
-  getUser(id: number): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getAllEvents(): Event[];
+  getUpcomingEvents(): Event[];
+  getEventById(id: number): Event | undefined;
+  createEvent(data: InsertEvent): Event;
+  updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined;
+  deleteEvent(id: number): boolean;
 }
 
-export class DatabaseStorage implements IStorage {
-  async getUser(id: number): Promise<User | undefined> {
-    return db.select().from(users).where(eq(users.id, id)).get();
-  }
+export const storage: IStorage = {
+  getAllEvents(): Event[] {
+    return db.select().from(events).orderBy(desc(events.eventDate)).all();
+  },
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return db.select().from(users).where(eq(users.username, username)).get();
-  }
+  getUpcomingEvents(): Event[] {
+    const today = new Date().toISOString().split("T")[0];
+    return db.select().from(events)
+      .where(gte(events.eventDate, today))
+      .orderBy(events.eventDate)
+      .all();
+  },
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    return db.insert(users).values(insertUser).returning().get();
-  }
-}
+  getEventById(id: number): Event | undefined {
+    return db.select().from(events).where(eq(events.id, id)).get();
+  },
 
-export const storage = new DatabaseStorage();
+  createEvent(data: InsertEvent): Event {
+    const now = new Date().toISOString();
+    return db.insert(events).values({
+      ...data,
+      createdAt: now,
+      updatedAt: now,
+    }).returning().get();
+  },
+
+  updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined {
+    const now = new Date().toISOString();
+    const result = db.update(events)
+      .set({ ...data, updatedAt: now })
+      .where(eq(events.id, id))
+      .returning()
+      .get();
+    return result;
+  },
+
+  deleteEvent(id: number): boolean {
+    const result = db.delete(events).where(eq(events.id, id)).run();
+    return result.changes > 0;
+  },
+};
