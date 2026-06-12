@@ -3,8 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
-
-    <!-- PWA / App meta -->
     <meta name="application-name" content="RallyPoint" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -12,23 +10,16 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#0B132B" />
     <meta name="description" content="RallyPoint — Sales event calendar. One Team. Every Event." />
-
-    <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
-
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
-
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
-
     <title>RallyPoint</title>
-
-    <!-- Splash screen styles -->
     <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
       #splash {
         position: fixed;
         inset: 0;
@@ -38,50 +29,148 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
-        transition: opacity 0.4s ease;
+        transition: opacity 0.6s ease;
+        overflow: hidden;
       }
       #splash.fade-out { opacity: 0; pointer-events: none; }
-      #splash .wordmark {
+
+      /* Radial pulse behind logo */
+      #splash-glow {
+        position: absolute;
+        width: 500px;
+        height: 500px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(37,99,255,0.18) 0%, transparent 70%);
+        animation: pulseGlow 2.5s ease-in-out infinite;
+      }
+      @keyframes pulseGlow {
+        0%, 100% { transform: scale(0.85); opacity: 0.6; }
+        50%       { transform: scale(1.15); opacity: 1; }
+      }
+
+      /* Logo mark wrapper — enters with scale+fade */
+      #splash-logo {
+        position: relative;
+        z-index: 2;
+        animation: logoEnter 0.9s cubic-bezier(0.34,1.56,0.64,1) forwards;
+        opacity: 0;
+      }
+      @keyframes logoEnter {
+        from { opacity: 0; transform: scale(0.5); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+
+      /* Each spoke animates in sequentially */
+      #splash-logo .spoke { animation: spokeIn 0.4s ease forwards; opacity: 0; }
+      #splash-logo .spoke:nth-child(1) { animation-delay: 0.9s; }
+      #splash-logo .spoke:nth-child(2) { animation-delay: 1.05s; }
+      #splash-logo .spoke:nth-child(3) { animation-delay: 1.2s; }
+      #splash-logo .spoke:nth-child(4) { animation-delay: 1.35s; }
+      #splash-logo .spoke:nth-child(5) { animation-delay: 1.5s; }
+      #splash-logo .spoke:nth-child(6) { animation-delay: 1.65s; }
+      @keyframes spokeIn {
+        from { opacity: 0; transform: scale(0.3); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+
+      /* Wordmark slides up after logo */
+      #splash-wordmark {
+        position: relative;
+        z-index: 2;
         font-family: Inter, system-ui, sans-serif;
         font-weight: 700;
-        font-size: 32px;
-        letter-spacing: -0.5px;
+        font-size: 48px;
+        letter-spacing: -1px;
         color: white;
-        margin-top: 20px;
+        margin-top: 28px;
+        animation: wordmarkEnter 0.7s ease forwards;
+        opacity: 0;
+        animation-delay: 1.8s;
       }
-      #splash .wordmark span { color: #00D4FF; }
-      #splash .tagline {
+      #splash-wordmark span { color: #00D4FF; }
+      @keyframes wordmarkEnter {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      /* Tagline fades in last */
+      #splash-tagline {
+        position: relative;
+        z-index: 2;
         font-family: Inter, system-ui, sans-serif;
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 500;
-        letter-spacing: 4px;
-        color: rgba(255,255,255,0.3);
-        margin-top: 8px;
+        letter-spacing: 5px;
+        color: rgba(255,255,255,0.35);
+        margin-top: 12px;
         text-transform: uppercase;
+        animation: taglineEnter 0.7s ease forwards;
+        opacity: 0;
+        animation-delay: 2.3s;
+      }
+      @keyframes taglineEnter {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+
+      /* Subtle ring that expands outward */
+      #splash-ring {
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        border-radius: 50%;
+        border: 1px solid rgba(37,99,255,0.3);
+        animation: ringExpand 3s ease-out infinite;
+        animation-delay: 1s;
+        z-index: 1;
+      }
+      @keyframes ringExpand {
+        0%   { transform: scale(1);   opacity: 0.6; }
+        100% { transform: scale(2.8); opacity: 0; }
       }
     </style>
   </head>
   <body>
-    <!-- Splash screen -->
     <div id="splash">
-      <svg width="80" height="80" viewBox="0 0 32 32" fill="none">
-        <rect width="32" height="32" rx="8" fill="#0B132B" stroke="#2563FF" stroke-width="0.5" stroke-opacity="0.4"/>
-        <circle cx="16" cy="16" r="2.5" fill="#2563FF"/>
-        <circle cx="16" cy="7" r="2" fill="#00D4FF"/>
-        <line x1="16" y1="9" x2="16" y2="13.5" stroke="#2563FF" stroke-width="1.5" stroke-linecap="round"/>
-        <circle cx="23.5" cy="10.5" r="2" fill="#FF9F1C"/>
-        <line x1="21.9" y1="11.9" x2="18" y2="14.8" stroke="#FF9F1C" stroke-width="1.5" stroke-linecap="round"/>
-        <circle cx="23.5" cy="21.5" r="2" fill="#FF5C7A"/>
-        <line x1="21.9" y1="20.1" x2="18" y2="17.2" stroke="#FF5C7A" stroke-width="1.5" stroke-linecap="round"/>
-        <circle cx="16" cy="25" r="2" fill="#8B5CF6"/>
-        <line x1="16" y1="23" x2="16" y2="18.5" stroke="#8B5CF6" stroke-width="1.5" stroke-linecap="round"/>
-        <circle cx="8.5" cy="21.5" r="2" fill="#FFD60A"/>
-        <line x1="10.1" y1="20.1" x2="14" y2="17.2" stroke="#FFD60A" stroke-width="1.5" stroke-linecap="round"/>
-        <circle cx="8.5" cy="10.5" r="2" fill="#00D4FF"/>
-        <line x1="10.1" y1="11.9" x2="14" y2="14.8" stroke="#00D4FF" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      <div class="wordmark">Rally<span>Point</span></div>
-      <div class="tagline">One Team. Every Event.</div>
+      <div id="splash-glow"></div>
+      <div id="splash-ring"></div>
+
+      <!-- Large animated logo mark -->
+      <div id="splash-logo">
+        <svg width="160" height="160" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="7" fill="#0B132B"/>
+          <!-- Center -->
+          <circle cx="16" cy="16" r="2.5" fill="#2563FF"/>
+          <!-- Spokes — each in its own group for per-element animation -->
+          <g class="spoke">
+            <circle cx="16" cy="7" r="2" fill="#00D4FF"/>
+            <line x1="16" y1="9" x2="16" y2="13.5" stroke="#2563FF" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="spoke">
+            <circle cx="23.5" cy="10.5" r="2" fill="#FF9F1C"/>
+            <line x1="21.9" y1="11.9" x2="18" y2="14.8" stroke="#FF9F1C" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="spoke">
+            <circle cx="23.5" cy="21.5" r="2" fill="#FF5C7A"/>
+            <line x1="21.9" y1="20.1" x2="18" y2="17.2" stroke="#FF5C7A" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="spoke">
+            <circle cx="16" cy="25" r="2" fill="#8B5CF6"/>
+            <line x1="16" y1="23" x2="16" y2="18.5" stroke="#8B5CF6" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="spoke">
+            <circle cx="8.5" cy="21.5" r="2" fill="#FFD60A"/>
+            <line x1="10.1" y1="20.1" x2="14" y2="17.2" stroke="#FFD60A" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="spoke">
+            <circle cx="8.5" cy="10.5" r="2" fill="#00D4FF"/>
+            <line x1="10.1" y1="11.9" x2="14" y2="14.8" stroke="#00D4FF" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+      </div>
+
+      <div id="splash-wordmark">Rally<span>Point</span></div>
+      <div id="splash-tagline">One Team &nbsp;·&nbsp; Every Event</div>
     </div>
 
     <div id="root"></div>
