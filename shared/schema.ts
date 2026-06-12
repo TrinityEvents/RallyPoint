@@ -8,6 +8,7 @@ export const EVENT_TYPES = [
   "Job Fair",
   "Trade Show",
   "Client Visit",
+  "Prospect Meeting",
   "Other",
 ] as const;
 
@@ -21,9 +22,9 @@ export const events = sqliteTable("events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   eventType: text("event_type").notNull(),
-  eventDate: text("event_date").notNull(), // ISO date string YYYY-MM-DD
-  startTime: text("start_time").notNull(), // HH:MM
-  endTime: text("end_time").notNull(),     // HH:MM
+  eventDate: text("event_date").notNull(),
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
   location: text("location"),
   sourceUrl: text("source_url"),
   sourcePlatform: text("source_platform").notNull().default("manual"),
@@ -34,7 +35,7 @@ export const events = sqliteTable("events", {
   reminderMinutes: integer("reminder_minutes"),
   status: text("status").notNull().default("upcoming"),
   outlookWebLink: text("outlook_web_link"),
-  graphEventId: text("graph_event_id"), // reserved for future Graph sync
+  graphEventId: text("graph_event_id"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
