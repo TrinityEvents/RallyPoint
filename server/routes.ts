@@ -282,7 +282,7 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // GET /api/events — all events ordered by date
   app.get("/api/events", (_req, res) => {
     try {
-      const allEvents = storage.getEvents();
+      const allEvents = storage.getAllEvents();
       res.json(allEvents);
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch events" });
