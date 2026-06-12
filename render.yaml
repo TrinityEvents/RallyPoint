@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: trinity-sales-mission
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: NODE_ENV=production node dist/index.cjs
+    plan: free
+    disk:
+      name: sqlite-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: /data/data.db
+      - key: SMTP_USER
+        sync: false   # you fill this in Render dashboard
+      - key: SMTP_PASS
+        sync: false   # you fill this in Render dashboard
+      - key: APP_URL
+        sync: false   # set to your Render URL after first deploy

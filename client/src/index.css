@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Load Inter from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    /* ── RallyPoint Light Mode ── */
+    --background:        220 25% 97%;
+    --foreground:        222 47% 11%;
+    --card:              0 0% 100%;
+    --card-foreground:   222 47% 11%;
+    --popover:           0 0% 100%;
+    --popover-foreground:222 47% 11%;
+
+    /* Primary: RallyPoint Blue */
+    --primary:           224 100% 57%;
+    --primary-foreground:0 0% 100%;
+
+    /* Secondary: soft navy */
+    --secondary:         220 20% 92%;
+    --secondary-foreground: 222 47% 20%;
+
+    /* Muted */
+    --muted:             220 15% 94%;
+    --muted-foreground:  220 10% 50%;
+
+    /* Accent: RallyPoint Cyan */
+    --accent:            191 100% 50%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive:       0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:            220 15% 88%;
+    --input:             220 15% 88%;
+    --ring:              224 100% 57%;
+    --radius:            0.5rem;
+
+    /* RallyPoint brand colors (used as CSS vars in components) */
+    --rp-navy:    #0B132B;
+    --rp-blue:    #2563FF;
+    --rp-cyan:    #00D4FF;
+    --rp-pink:    #FF5C7A;
+    --rp-orange:  #FF9F1C;
+    --rp-yellow:  #FFD60A;
+    --rp-purple:  #8B5CF6;
+    --rp-gray:    #64748B;
+  }
+
+  .dark {
+    /* ── RallyPoint Dark Mode (primary experience) ── */
+    --background:        222 47% 7%;
+    --foreground:        210 20% 95%;
+    --card:              222 40% 11%;
+    --card-foreground:   210 20% 95%;
+    --popover:           222 40% 11%;
+    --popover-foreground:210 20% 95%;
+
+    --primary:           224 100% 62%;
+    --primary-foreground:0 0% 100%;
+
+    --secondary:         222 35% 16%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted:             222 35% 16%;
+    --muted-foreground:  220 15% 55%;
+
+    --accent:            191 100% 50%;
+    --accent-foreground: 222 47% 7%;
+
+    --destructive:       0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:            222 30% 18%;
+    --input:             222 30% 18%;
+    --ring:              224 100% 62%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ── RallyPoint Header ── */
+.rallypoint-header {
+  background: #0B132B;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ── Event type badge colors (RallyPoint palette) ── */
+.badge-chamber      { background: rgba(37,99,255,0.12);  color: #2563FF;  border: 1px solid rgba(37,99,255,0.25); }
+.badge-networking   { background: rgba(139,92,246,0.12); color: #8B5CF6;  border: 1px solid rgba(139,92,246,0.25); }
+.badge-job-fair     { background: rgba(0,212,255,0.12);  color: #00D4FF;  border: 1px solid rgba(0,212,255,0.25); }
+.badge-trade-show   { background: rgba(255,159,28,0.12); color: #FF9F1C;  border: 1px solid rgba(255,159,28,0.25); }
+.badge-client-visit { background: rgba(255,92,122,0.12); color: #FF5C7A;  border: 1px solid rgba(255,92,122,0.25); }
+.badge-other        { background: rgba(100,116,139,0.12);color: #64748B;  border: 1px solid rgba(100,116,139,0.25); }
+
+/* Dark mode badge adjustments */
+.dark .badge-chamber      { background: rgba(37,99,255,0.18);  color: #6b9fff; }
+.dark .badge-networking   { background: rgba(139,92,246,0.18); color: #b197fc; }
+.dark .badge-job-fair     { background: rgba(0,212,255,0.18);  color: #5edfff; }
+.dark .badge-trade-show   { background: rgba(255,159,28,0.18); color: #ffc145; }
+.dark .badge-client-visit { background: rgba(255,92,122,0.18); color: #ff8fa3; }
+.dark .badge-other        { background: rgba(100,116,139,0.18);color: #94a3b8; }
+
+/* ── Attending badge colors ── */
+.badge-ryan      { background: rgba(37,99,255,0.12);  color: #2563FF;  border: 1px solid rgba(37,99,255,0.3); }
+.badge-connie    { background: rgba(255,92,122,0.12); color: #FF5C7A;  border: 1px solid rgba(255,92,122,0.3); }
+.badge-both      { background: rgba(0,212,255,0.12);  color: #00D4FF;  border: 1px solid rgba(0,212,255,0.3); }
+.badge-tentative { background: rgba(255,214,10,0.12); color: #b38900;  border: 1px solid rgba(255,214,10,0.3); }
+
+.dark .badge-ryan      { color: #6b9fff; }
+.dark .badge-connie    { color: #ff8fa3; }
+.dark .badge-both      { color: #5edfff; }
+.dark .badge-tentative { background: rgba(255,214,10,0.15); color: #FFD60A; }
+
+/* ── Status badge colors ── */
+.badge-upcoming   { background: rgba(37,99,255,0.1);  color: #2563FF; }
+.badge-attended   { background: rgba(0,212,255,0.1);  color: #00D4FF; }
+.badge-cancelled  { background: rgba(255,92,122,0.1); color: #FF5C7A; }
+.badge-postponed  { background: rgba(255,214,10,0.1); color: #b38900; }
