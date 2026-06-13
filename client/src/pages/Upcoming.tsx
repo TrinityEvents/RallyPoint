@@ -1,3 +1,5 @@
+EditModal sales notes section added
+EventCard sales notes display added
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -258,6 +260,7 @@ function CalendarView({ events }: { events: Event[] }) {
 function EditModal({ event, open, onClose }: { event: Event; open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const [notes, setNotes] = useState(event.notes ?? "");
+  const [salesNotes, setSalesNotes] = useState(event.salesNotes ?? "");
   const [attending, setAttending] = useState(event.attending);
   const [status, setStatus] = useState(event.status);
 
@@ -269,7 +272,7 @@ function EditModal({ event, open, onClose }: { event: Event; open: boolean; onCl
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data: { notes: string; attending: string; status: string }) =>
+    mutationFn: (data: { notes: string; salesNotes: string; attending: string; status: string }) =>
       apiRequest("PATCH", `/api/events/${event.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
@@ -347,20 +350,35 @@ function EditModal({ event, open, onClose }: { event: Event; open: boolean; onCl
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Notes</label>
+            <label className="text-sm font-medium mb-1.5 block">Pre-Event Notes</label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Opportunity context, contacts met, follow-up needed..."
+              rows={2}
+              placeholder="Event context, who to meet, goals..."
               data-testid="edit-notes"
+            />
+          </div>
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-1.5">
+              <label className="text-sm font-semibold text-foreground">Sales Notes</label>
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Post-Event</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">Contacts made, opportunities, follow-ups needed, pipeline notes</p>
+            <Textarea
+              value={salesNotes}
+              onChange={(e) => setSalesNotes(e.target.value)}
+              rows={4}
+              placeholder="Who did we meet? Any hot leads? Follow-up actions? Worth attending again?"
+              data-testid="edit-sales-notes"
+              className="border-primary/30 focus:border-primary"
             />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} data-testid="btn-cancel-edit">Cancel</Button>
           <Button
-            onClick={() => updateMutation.mutate({ notes, attending, status })}
+            onClick={() => updateMutation.mutate({ notes, salesNotes, attending, status })}
             disabled={updateMutation.isPending}
             data-testid="btn-save-edit"
           >
@@ -433,7 +451,13 @@ function EventCard({ event }: { event: Event }) {
           </div>
         )}
         {event.notes && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3 border-l-2 border-muted pl-2">{event.notes}</p>
+          <p className="text-sm text-muted-foreground line-clamp-2 mb-2 border-l-2 border-muted pl-2">{event.notes}</p>
+        )}
+        {event.salesNotes && (
+          <div className="mb-3 rounded-lg bg-primary/5 border border-primary/15 px-3 py-2">
+            <p className="text-xs font-semibold text-primary mb-0.5">Sales Notes</p>
+            <p className="text-sm text-foreground/80 line-clamp-3">{event.salesNotes}</p>
+          </div>
         )}
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
