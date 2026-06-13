@@ -1,5 +1,3 @@
-EditModal sales notes section added
-EventCard sales notes display added
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
