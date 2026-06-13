@@ -13,9 +13,7 @@ export const EVENT_TYPES = [
 ] as const;
 
 export const ATTENDING_OPTIONS = ["Ryan", "Connie", "Both", "Tentative"] as const;
-
 export const EVENT_STATUSES = ["upcoming", "attended", "cancelled", "postponed"] as const;
-
 export const SOURCE_PLATFORMS = ["linkedin", "email", "chamber", "website", "manual"] as const;
 
 export const events = sqliteTable("events", {
@@ -32,6 +30,7 @@ export const events = sqliteTable("events", {
   addedBy: text("added_by").notNull(),
   attending: text("attending").notNull(),
   notes: text("notes"),
+  salesNotes: text("sales_notes"),
   reminderMinutes: integer("reminder_minutes"),
   status: text("status").notNull().default("upcoming"),
   outlookWebLink: text("outlook_web_link"),
