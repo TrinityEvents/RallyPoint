@@ -35,6 +35,7 @@ sqlite.exec(`
     added_by TEXT NOT NULL,
     attending TEXT NOT NULL,
     notes TEXT,
+    sales_notes TEXT,
     reminder_minutes INTEGER,
     status TEXT NOT NULL DEFAULT 'upcoming',
     outlook_web_link TEXT,
@@ -43,6 +44,15 @@ sqlite.exec(`
     updated_at TEXT NOT NULL
   )
 `);
+
+// Add sales_notes column if upgrading from older DB
+try {
+  sqlite.exec(`ALTER TABLE events ADD COLUMN sales_notes TEXT`);
+  console.log("[storage] added sales_notes column");
+} catch {
+  // Column already exists — fine
+}
+
 console.log("[storage] schema ready");
 
 function rowToEvent(row: any): Event {
@@ -60,6 +70,7 @@ function rowToEvent(row: any): Event {
     addedBy: row.added_by,
     attending: row.attending,
     notes: row.notes,
+    salesNotes: row.sales_notes,
     reminderMinutes: row.reminder_minutes,
     status: row.status,
     outlookWebLink: row.outlook_web_link,
@@ -80,61 +91,46 @@ export interface IStorage {
 
 export const storage: IStorage = {
   getAllEvents(): Event[] {
-    const rows = sqlite.prepare("SELECT * FROM events ORDER BY event_date DESC").all();
-    return rows.map(rowToEvent);
+    return sqlite.prepare("SELECT * FROM events ORDER BY event_date DESC").all().map(rowToEvent);
   },
-
   getUpcomingEvents(): Event[] {
     const today = new Date().toISOString().split("T")[0];
-    const rows = sqlite.prepare(
-      "SELECT * FROM events WHERE event_date >= ? ORDER BY event_date ASC"
-    ).all(today);
-    return rows.map(rowToEvent);
+    return sqlite.prepare("SELECT * FROM events WHERE event_date >= ? ORDER BY event_date ASC").all(today).map(rowToEvent);
   },
-
   getEventById(id: number): Event | undefined {
     const row = sqlite.prepare("SELECT * FROM events WHERE id = ?").get(id);
     return row ? rowToEvent(row) : undefined;
   },
-
   createEvent(data: InsertEvent): Event {
     const now = new Date().toISOString();
-    const stmt = sqlite.prepare(`
+    const result = sqlite.prepare(`
       INSERT INTO events (
         title, event_type, event_date, start_time, end_time,
         location, source_url, source_platform, source_text_snapshot,
-        added_by, attending, notes, reminder_minutes, status,
+        added_by, attending, notes, sales_notes, reminder_minutes, status,
         outlook_web_link, graph_event_id, created_at, updated_at
       ) VALUES (
         @title, @eventType, @eventDate, @startTime, @endTime,
         @location, @sourceUrl, @sourcePlatform, @sourceTextSnapshot,
-        @addedBy, @attending, @notes, @reminderMinutes, @status,
+        @addedBy, @attending, @notes, @salesNotes, @reminderMinutes, @status,
         @outlookWebLink, @graphEventId, @createdAt, @updatedAt
       )
-    `);
-    const result = stmt.run({
-      title: data.title,
-      eventType: data.eventType,
-      eventDate: data.eventDate,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      location: data.location ?? null,
-      sourceUrl: data.sourceUrl ?? null,
+    `).run({
+      title: data.title, eventType: data.eventType, eventDate: data.eventDate,
+      startTime: data.startTime, endTime: data.endTime,
+      location: data.location ?? null, sourceUrl: data.sourceUrl ?? null,
       sourcePlatform: data.sourcePlatform ?? "manual",
       sourceTextSnapshot: data.sourceTextSnapshot ?? null,
-      addedBy: data.addedBy,
-      attending: data.attending,
-      notes: data.notes ?? null,
+      addedBy: data.addedBy, attending: data.attending,
+      notes: data.notes ?? null, salesNotes: data.salesNotes ?? null,
       reminderMinutes: data.reminderMinutes ?? null,
       status: data.status ?? "upcoming",
       outlookWebLink: data.outlookWebLink ?? null,
       graphEventId: data.graphEventId ?? null,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: now, updatedAt: now,
     });
     return this.getEventById(Number(result.lastInsertRowid))!;
   },
-
   updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined {
     const existing = this.getEventById(id);
     if (!existing) return undefined;
@@ -142,47 +138,32 @@ export const storage: IStorage = {
     const merged = { ...existing, ...data };
     sqlite.prepare(`
       UPDATE events SET
-        title = @title,
-        event_type = @eventType,
-        event_date = @eventDate,
-        start_time = @startTime,
-        end_time = @endTime,
-        location = @location,
-        source_url = @sourceUrl,
-        source_platform = @sourcePlatform,
-        source_text_snapshot = @sourceTextSnapshot,
-        added_by = @addedBy,
-        attending = @attending,
-        notes = @notes,
-        reminder_minutes = @reminderMinutes,
-        status = @status,
-        outlook_web_link = @outlookWebLink,
-        graph_event_id = @graphEventId,
-        updated_at = @updatedAt
-      WHERE id = @id
+        title=@title, event_type=@eventType, event_date=@eventDate,
+        start_time=@startTime, end_time=@endTime, location=@location,
+        source_url=@sourceUrl, source_platform=@sourcePlatform,
+        source_text_snapshot=@sourceTextSnapshot,
+        added_by=@addedBy, attending=@attending,
+        notes=@notes, sales_notes=@salesNotes,
+        reminder_minutes=@reminderMinutes, status=@status,
+        outlook_web_link=@outlookWebLink, graph_event_id=@graphEventId,
+        updated_at=@updatedAt
+      WHERE id=@id
     `).run({
-      title: merged.title,
-      eventType: merged.eventType,
-      eventDate: merged.eventDate,
-      startTime: merged.startTime,
-      endTime: merged.endTime,
-      location: merged.location ?? null,
-      sourceUrl: merged.sourceUrl ?? null,
+      title: merged.title, eventType: merged.eventType, eventDate: merged.eventDate,
+      startTime: merged.startTime, endTime: merged.endTime,
+      location: merged.location ?? null, sourceUrl: merged.sourceUrl ?? null,
       sourcePlatform: merged.sourcePlatform ?? "manual",
       sourceTextSnapshot: merged.sourceTextSnapshot ?? null,
-      addedBy: merged.addedBy,
-      attending: merged.attending,
-      notes: merged.notes ?? null,
+      addedBy: merged.addedBy, attending: merged.attending,
+      notes: merged.notes ?? null, salesNotes: merged.salesNotes ?? null,
       reminderMinutes: merged.reminderMinutes ?? null,
       status: merged.status ?? "upcoming",
       outlookWebLink: merged.outlookWebLink ?? null,
       graphEventId: merged.graphEventId ?? null,
-      updatedAt: now,
-      id,
+      updatedAt: now, id,
     });
     return this.getEventById(id);
   },
-
   deleteEvent(id: number): boolean {
     const result = sqlite.prepare("DELETE FROM events WHERE id = ?").run(id);
     return result.changes > 0;
