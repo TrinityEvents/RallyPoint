@@ -99,7 +99,6 @@ function Header() {
         <div className="flex items-center justify-between py-3">
           <RallyPointLogo />
           <div className="flex items-center gap-1">
-            <span className="text-white/25 text-xs font-medium tracking-widest uppercase mr-2 hidden sm:block">Sales Mission</span>
             <ThemeToggle />
           </div>
         </div>

@@ -4,8 +4,21 @@ import { events, type Event, type InsertEvent } from "@shared/schema";
 import { eq, desc, gte } from "drizzle-orm";
 import { resolve } from "path";
 
-// On Render: DATABASE_URL=/data/data.db (persistent disk). Locally: data.db in project root.
-const DB_PATH = process.env.DATABASE_URL || resolve(process.cwd(), "data.db");
+// On Render: DATABASE_URL=/data/data.db (persistent disk) if disk is mounted.
+// Falls back to data.db in project root if /data dir doesn't exist (free tier).
+import { existsSync, mkdirSync } from "fs";
+function resolveDbPath(): string {
+  const envPath = process.env.DATABASE_URL;
+  if (envPath) {
+    const dir = envPath.substring(0, envPath.lastIndexOf("/"));
+    if (dir && !existsSync(dir)) {
+      try { mkdirSync(dir, { recursive: true }); } catch { /* fall through */ }
+    }
+    if (!dir || existsSync(dir)) return envPath;
+  }
+  return resolve(process.cwd(), "data.db");
+}
+const DB_PATH = resolveDbPath();
 const sqlite = new Database(DB_PATH);
 const db = drizzle(sqlite);
 

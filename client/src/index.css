@@ -101,6 +101,7 @@
 .badge-job-fair     { background: rgba(0,212,255,0.12);  color: #00D4FF;  border: 1px solid rgba(0,212,255,0.25); }
 .badge-trade-show   { background: rgba(255,159,28,0.12); color: #FF9F1C;  border: 1px solid rgba(255,159,28,0.25); }
 .badge-client-visit { background: rgba(255,92,122,0.12); color: #FF5C7A;  border: 1px solid rgba(255,92,122,0.25); }
+.badge-prospect     { background: rgba(16,185,129,0.12);  color: #059669;  border: 1px solid rgba(16,185,129,0.25); }
 .badge-other        { background: rgba(100,116,139,0.12);color: #64748B;  border: 1px solid rgba(100,116,139,0.25); }
 
 /* Dark mode badge adjustments */
@@ -109,6 +110,7 @@
 .dark .badge-job-fair     { background: rgba(0,212,255,0.18);  color: #5edfff; }
 .dark .badge-trade-show   { background: rgba(255,159,28,0.18); color: #ffc145; }
 .dark .badge-client-visit { background: rgba(255,92,122,0.18); color: #ff8fa3; }
+.dark .badge-prospect     { background: rgba(16,185,129,0.18);  color: #34d399; }
 .dark .badge-other        { background: rgba(100,116,139,0.18);color: #94a3b8; }
 
 /* ── Attending badge colors ── */

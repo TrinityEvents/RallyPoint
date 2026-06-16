@@ -40,12 +40,13 @@ function daysUntil(dateStr: string): number {
 
 function eventTypeBadgeClass(type: string) {
   const map: Record<string, string> = {
-    "Chamber":      "badge-chamber",
-    "Networking":   "badge-networking",
-    "Job Fair":     "badge-job-fair",
-    "Trade Show":   "badge-trade-show",
-    "Client Visit": "badge-client-visit",
-    "Other":        "badge-other",
+    "Chamber":          "badge-chamber",
+    "Networking":        "badge-networking",
+    "Job Fair":          "badge-job-fair",
+    "Trade Show":        "badge-trade-show",
+    "Client Visit":      "badge-client-visit",
+    "Prospect Meeting":  "badge-prospect",
+    "Other":             "badge-other",
   };
   return map[type] ?? "badge-other";
 }
@@ -264,9 +265,11 @@ function EventCard({ event }: { event: Event }) {
       <div
         data-testid={`event-card-${event.id}`}
         className={cn(
-          "rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow p-4",
+          "rounded-xl border shadow-sm hover:shadow-lg transition-all p-4",
+          "bg-white dark:bg-slate-800/90",
+          "border-slate-200 dark:border-slate-700",
           event.status === "cancelled" && "opacity-60",
-          event.status === "attended" && "border-green-200 dark:border-green-900"
+          event.status === "attended" && "border-green-300 dark:border-green-800 bg-green-50/60 dark:bg-green-900/10"
         )}
       >
         {/* Top row: type badge + days chip + attending */}
@@ -294,7 +297,7 @@ function EventCard({ event }: { event: Event }) {
         </div>
 
         {/* Title */}
-        <h3 className="font-semibold text-foreground text-base leading-snug mb-1">{event.title}</h3>
+        <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-base leading-snug mb-1">{event.title}</h3>
 
         {/* Date + time */}
         <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
@@ -488,21 +491,32 @@ export default function UpcomingPage() {
 
         {/* Type filters */}
         <div className="flex flex-wrap gap-1.5">
-          {(["All", ...EVENT_TYPES] as TypeFilter[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTypeFilter(t)}
-              data-testid={`filter-type-${t.toLowerCase().replace(/\s/g, "-")}`}
-              className={cn(
-                "px-2.5 py-1 text-xs rounded-full border font-medium transition-colors",
-                typeFilter === t
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
-              )}
-            >
-              {t}
-            </button>
-          ))}
+          {(["All", ...EVENT_TYPES] as TypeFilter[]).map((t) => {
+            const TYPE_COLORS: Record<string, { active: string; inactive: string }> = {
+              "All":              { active: "bg-primary text-white border-primary",                                                                inactive: "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground" },
+              "Chamber":          { active: "bg-[#2563FF] text-white border-[#2563FF]",                                                           inactive: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100" },
+              "Networking":       { active: "bg-[#8B5CF6] text-white border-[#8B5CF6]",                                                           inactive: "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800 hover:bg-purple-100" },
+              "Job Fair":         { active: "bg-[#00D4FF] text-slate-900 border-[#00D4FF]",                                                       inactive: "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100" },
+              "Trade Show":       { active: "bg-[#FF9F1C] text-white border-[#FF9F1C]",                                                           inactive: "bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100" },
+              "Client Visit":     { active: "bg-[#FF5C7A] text-white border-[#FF5C7A]",                                                           inactive: "bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400 border-pink-200 dark:border-pink-800 hover:bg-pink-100" },
+              "Prospect Meeting": { active: "bg-[#10b981] text-white border-[#10b981]",                                                           inactive: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100" },
+              "Other":            { active: "bg-slate-500 text-white border-slate-500",                                                            inactive: "bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100" },
+            };
+            const colors = TYPE_COLORS[t] ?? TYPE_COLORS["Other"];
+            return (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                data-testid={`filter-type-${t.toLowerCase().replace(/\s/g, "-")}`}
+                className={cn(
+                  "px-2.5 py-1 text-xs rounded-full border font-medium transition-all",
+                  typeFilter === t ? colors.active : colors.inactive
+                )}
+              >
+                {t}
+              </button>
+            );
+          })}
         </div>
 
         {/* Attendee filters */}
