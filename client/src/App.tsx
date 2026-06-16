@@ -81,7 +81,7 @@ function Header() {
     return (
       <Link href={path}>
         <a
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md transition-colors ${
+          className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium rounded-t-md transition-colors whitespace-nowrap shrink-0 ${
             active
               ? "bg-background text-foreground"
               : "text-white/55 hover:text-white hover:bg-white/8"

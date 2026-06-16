@@ -34,7 +34,14 @@ function formatDate(dateStr: string) {
 }
 
 function formatTime(t: string) {
+  if (!t) return "";
+  // Already formatted: "6:30 PM" or "06:30 PM" — return as-is (strip leading zero from hour)
+  if (/am|pm/i.test(t)) {
+    return t.replace(/^0(\d):/, '$1:').trim();
+  }
+  // 24h format: "18:30"
   const [h, m] = t.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return t;
   const ampm = h >= 12 ? "PM" : "AM";
   const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, "0")} ${ampm}`;
@@ -210,7 +217,7 @@ function EventDetailSheet({
       */}
       <SheetContent
         side="bottom"
-        className="max-h-[80vh] flex flex-col p-0 rounded-t-2xl sm:mx-auto sm:max-w-[680px] sm:rounded-2xl"
+        className="max-h-[80vh] flex flex-col p-0 rounded-t-2xl sm:mx-auto sm:max-w-[680px] sm:rounded-2xl [&>button:last-child]:hidden"
         data-testid="event-detail-sheet"
       >
         {/* ── HEADER ─────────────────────────────────────────────────────── */}
@@ -256,7 +263,7 @@ function EventDetailSheet({
             <button
               onClick={() => setEditMode(!editMode)}
               className={cn(
-                "shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all",
+                "shrink-0 flex items-center gap-1.5 text-[11px] font-semibold px-3 py-2.5 min-h-[44px] rounded-lg border transition-all",
                 editMode
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-primary/50"
@@ -303,7 +310,7 @@ function EventDetailSheet({
           */}
           <div className={cn(
             !editMode && hasNotes
-              ? "md:grid md:grid-cols-[200px_1fr] md:gap-x-4 space-y-3 md:space-y-0"
+              ? "sm:grid sm:grid-cols-[210px_1fr] sm:gap-x-4 space-y-3 sm:space-y-0"
               : "space-y-3"
           )}>
 
@@ -332,16 +339,15 @@ function EventDetailSheet({
                     <User size={10} /> {event.addedBy}
                   </span>
                   <span className="flex items-center gap-1">
-                    <SourceIcon platform={event.sourcePlatform} />
-                    {event.sourcePlatform || "Manual"}
+                    <SourceIcon platform={event.sourcePlatform || "manual"} />
                   </span>
                 </div>
 
                 {/* Add to calendar */}
-                <div className="px-3 py-2">
+                <div className="px-3 py-1">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors">
+                      <button className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors min-h-[40px] w-full text-left">
                         <CalendarPlus size={11} /> Add to Calendar
                       </button>
                     </DropdownMenuTrigger>
@@ -370,7 +376,7 @@ function EventDetailSheet({
               </div>
 
               {/* Contact Log sits in left col on desktop, below everything on mobile */}
-              <div className="hidden md:block">
+              <div className="hidden sm:block">
                 {!editMode && <ContactLog eventId={event.id} />}
               </div>
             </div>
@@ -526,8 +532,8 @@ function EventDetailSheet({
                 </div>
               )}
 
-              {/* Contact Log — mobile: below notes. Desktop: in left col above */}
-              <div className="md:hidden">
+              {/* Contact Log — mobile: below notes. Tablet/desktop: in left col */}
+              <div className="sm:hidden">
                 <ContactLog eventId={event.id} />
               </div>
             </div>
