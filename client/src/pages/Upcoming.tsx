@@ -141,15 +141,15 @@ function EditModal({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg" data-testid="edit-modal">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col" data-testid="edit-modal">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-base font-semibold">{event.title}</DialogTitle>
           <p className="text-sm text-muted-foreground">
             {formatDate(eventDate)} · {formatTime(event.startTime)} – {formatTime(event.endTime)}
           </p>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
           {/* Full details read view */}
           <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
             {event.location && (
@@ -259,7 +259,7 @@ function EditModal({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 pt-2 border-t border-border/50">
           <Button variant="outline" onClick={onClose} data-testid="btn-cancel-edit">Cancel</Button>
           <Button
             onClick={() => updateMutation.mutate({ notes, salesNotes, attending, status, eventDate })}
