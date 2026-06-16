@@ -1,12 +1,13 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
-import { insertEventSchema } from "@shared/schema";
+import { insertEventSchema, insertContactSchema } from "@shared/schema";
 import { z } from "zod";
 import * as cheerio from "cheerio";
 import https from "https";
 import http from "http";
 import { sendNewEventNotification } from "./notify";
+import { saveSubscription, removeSubscription, sendPushToAll } from "./push";
 
 // ──────────────────────────────────────────────────
 // URL Event Parser — fetch a page and heuristically
@@ -304,6 +305,50 @@ function parseEventFromHtml(html: string, url: string) {
 }
 
 export function registerRoutes(httpServer: Server, app: Express) {
+  // ── Push subscription endpoints ────────────────────────────────────────────
+
+  // POST /api/push/subscribe — save a push subscription from the browser
+  app.post("/api/push/subscribe", (req, res) => {
+    try {
+      const sub = req.body;
+      if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+        return res.status(400).json({ error: "Invalid subscription object" });
+      }
+      const label = req.body.label || null;
+      saveSubscription(sub, label);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // DELETE /api/push/subscribe — remove a subscription
+  app.delete("/api/push/subscribe", (req, res) => {
+    try {
+      const { endpoint } = req.body;
+      if (!endpoint) return res.status(400).json({ error: "endpoint required" });
+      removeSubscription(endpoint);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // POST /api/push/test — send a test push to all subscribers
+  app.post("/api/push/test", async (_req, res) => {
+    try {
+      await sendPushToAll({
+        title: "RallyPoint",
+        body:  "Push notifications are working!",
+        url:   "/",
+        tag:   "test",
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.json({ ok: false, error: err?.message });
+    }
+  });
+
   // GET /api/settings/status — returns whether SMTP is configured
   app.get("/api/settings/status", (_req, res) => {
     const configured = !!(process.env.SMTP_USER && process.env.SMTP_PASS);
@@ -455,10 +500,16 @@ export function registerRoutes(httpServer: Server, app: Express) {
       }
       const event = storage.createEvent(parsed.data);
       res.status(201).json(event);
-      // Fire-and-forget notification — never blocks the response
+      // Fire-and-forget: email + push notification
       sendNewEventNotification(event).catch((err) =>
         console.error("[notify] Email failed:", err?.message)
       );
+      sendPushToAll({
+        title: `New Event: ${event.title}`,
+        body:  `${event.eventDate} · ${event.attending} attending`,
+        url:   "/",
+        tag:   `event-${event.id}`,
+      }).catch((err) => console.error("[push] Failed:", err?.message));
     } catch (err) {
       res.status(500).json({ error: "Failed to create event" });
     }
@@ -553,6 +604,47 @@ export function registerRoutes(httpServer: Server, app: Express) {
     } catch (err) {
       res.status(500).json({ error: "Failed to generate calendar file" });
     }
+  });
+
+  // ── Contact routes ──────────────────────────────────────────────────
+
+  // GET /api/events/:id/contacts
+  app.get("/api/events/:id/contacts", (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      res.json(storage.getContactsByEvent(eventId));
+    } catch { res.status(500).json({ error: "Failed to fetch contacts" }); }
+  });
+
+  // POST /api/events/:id/contacts
+  app.post("/api/events/:id/contacts", (req, res) => {
+    try {
+      const eventId = parseInt(req.params.id);
+      const parsed = insertContactSchema.safeParse({ ...req.body, eventId });
+      if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+      const contact = storage.createContact(parsed.data);
+      res.status(201).json(contact);
+    } catch { res.status(500).json({ error: "Failed to create contact" }); }
+  });
+
+  // PATCH /api/contacts/:id
+  app.patch("/api/contacts/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = storage.updateContact(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Contact not found" });
+      res.json(updated);
+    } catch { res.status(500).json({ error: "Failed to update contact" }); }
+  });
+
+  // DELETE /api/contacts/:id
+  app.delete("/api/contacts/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = storage.deleteContact(id);
+      if (!deleted) return res.status(404).json({ error: "Contact not found" });
+      res.json({ success: true });
+    } catch { res.status(500).json({ error: "Failed to delete contact" }); }
   });
 
   // DELETE /api/events/:id

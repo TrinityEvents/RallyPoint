@@ -51,3 +51,26 @@ export const insertEventSchema = createInsertSchema(events).omit({
 
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
+
+// ── Contacts (people met at events) ────────────────────────────────────────────
+export const contacts = sqliteTable("contacts", {
+  id:        integer("id").primaryKey({ autoIncrement: true }),
+  eventId:   integer("event_id").notNull(),
+  name:      text("name").notNull(),
+  title:     text("title"),        // job title
+  company:   text("company"),
+  email:     text("email"),
+  phone:     text("phone"),
+  linkedin:  text("linkedin"),
+  notes:     text("notes"),        // quick follow-up note
+  hotLead:   integer("hot_lead").notNull().default(0), // 0=false, 1=true
+  createdAt: text("created_at").notNull(),
+});
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type Contact = typeof contacts.$inferSelect;

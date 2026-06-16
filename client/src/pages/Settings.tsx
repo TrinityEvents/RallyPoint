@@ -1,15 +1,54 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Mail, Eye, EyeOff, ExternalLink, AlertCircle } from "lucide-react";
+import { CheckCircle2, Mail, Eye, EyeOff, ExternalLink, AlertCircle, Bell, BellOff } from "lucide-react";
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [smtpUser, setSmtpUser] = useState("");
+
+  // ── Push notification state ────────────────────────────────────
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushGranted, setPushGranted] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  useEffect(() => {
+    setPushSupported("serviceWorker" in navigator && "PushManager" in window);
+    setPushGranted("Notification" in window && Notification.permission === "granted");
+  }, []);
+
+  async function enablePush() {
+    setPushLoading(true);
+    try {
+      const result = await (window as any).requestPushPermission?.();
+      if (result?.ok) {
+        setPushGranted(true);
+        toast({ title: "Push notifications enabled", description: "You\'ll get alerted when new events are added." });
+      } else {
+        toast({ title: "Permission denied", description: "Allow notifications in your browser settings.", variant: "destructive" });
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Could not enable push notifications.", variant: "destructive" });
+    } finally {
+      setPushLoading(false);
+    }
+  }
+
+  async function testPush() {
+    setPushLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/push/test", {});
+      const data = await res.json();
+      if (data.ok) toast({ title: "Test push sent!", description: "Check your device for the notification." });
+      else toast({ title: "Send failed", description: data.error, variant: "destructive" });
+    } finally {
+      setPushLoading(false);
+    }
+  }
   const [smtpPass, setSmtpPass] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [testEmail, setTestEmail] = useState("ryan@trinitystaffing.com");
@@ -168,6 +207,40 @@ export default function SettingsPage() {
               {testMutation.isPending ? "Sending..." : "Send Test"}
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Push Notifications */}
+      {pushSupported && (
+        <div className="space-y-3 border-t border-border pt-6">
+          <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+            <Bell size={14} /> Push Notifications
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Get instant push alerts on this device when a new event is added — even when the app isn\'t open.
+          </p>
+          {pushGranted ? (
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle2 size={15} /> Push enabled on this device
+              </div>
+              <Button size="sm" variant="outline" onClick={testPush} disabled={pushLoading}>
+                {pushLoading ? "Sending..." : "Send Test Push"}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={enablePush}
+              disabled={pushLoading}
+              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Bell size={14} />
+              {pushLoading ? "Requesting..." : "Enable Push Notifications"}
+            </Button>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Each device / browser needs to enable separately. Both Ryan and Connie should do this on their own phones.
+          </p>
         </div>
       )}
 

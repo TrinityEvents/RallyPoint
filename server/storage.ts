@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
-import { events, type Event, type InsertEvent } from "@shared/schema";
+import { events, contacts, type Event, type InsertEvent, type Contact, type InsertContact } from "@shared/schema";
 import { eq, desc, gte } from "drizzle-orm";
 import { resolve } from "path";
 
@@ -48,6 +48,23 @@ sqlite.exec(`
   )
 `);
 
+// Create contacts table
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS contacts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id   INTEGER NOT NULL,
+    name       TEXT NOT NULL,
+    title      TEXT,
+    company    TEXT,
+    email      TEXT,
+    phone      TEXT,
+    linkedin   TEXT,
+    notes      TEXT,
+    hot_lead   INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+  )
+`);
+
 // ── Migrations: add columns to existing DB if missing ──────────────────────
 try { sqlite.exec(`ALTER TABLE events ADD COLUMN sales_notes TEXT`); } catch { /* column already exists */ }
 
@@ -58,6 +75,11 @@ export interface IStorage {
   createEvent(data: InsertEvent): Event;
   updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined;
   deleteEvent(id: number): boolean;
+  // Contacts
+  getContactsByEvent(eventId: number): Contact[];
+  createContact(data: InsertContact): Contact;
+  updateContact(id: number, data: Partial<InsertContact>): Contact | undefined;
+  deleteContact(id: number): boolean;
 }
 
 export const storage: IStorage = {
@@ -98,6 +120,25 @@ export const storage: IStorage = {
 
   deleteEvent(id: number): boolean {
     const result = db.delete(events).where(eq(events.id, id)).run();
+    return result.changes > 0;
+  },
+
+  // ── Contacts ─────────────────────────────────────────────────────
+  getContactsByEvent(eventId: number): Contact[] {
+    return db.select().from(contacts).where(eq(contacts.eventId, eventId)).all();
+  },
+
+  createContact(data: InsertContact): Contact {
+    const now = new Date().toISOString();
+    return db.insert(contacts).values({ ...data, createdAt: now }).returning().get();
+  },
+
+  updateContact(id: number, data: Partial<InsertContact>): Contact | undefined {
+    return db.update(contacts).set(data).where(eq(contacts.id, id)).returning().get();
+  },
+
+  deleteContact(id: number): boolean {
+    const result = db.delete(contacts).where(eq(contacts.id, id)).run();
     return result.changes > 0;
   },
 };
