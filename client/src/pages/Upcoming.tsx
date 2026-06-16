@@ -201,16 +201,16 @@ function EventDetailSheet({
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent
         side="bottom"
-        className="h-[92vh] flex flex-col p-0 rounded-t-2xl overflow-hidden"
+        className="max-h-[78vh] flex flex-col p-0 rounded-t-2xl"
         data-testid="event-detail-sheet"
       >
         {/* Colored header band */}
         <div
-          className="shrink-0 px-5 pt-5 pb-4"
-          style={{ background: `linear-gradient(135deg, ${typeColor}18 0%, transparent 100%)`, borderBottom: `2px solid ${typeColor}33` }}
+          className="shrink-0 px-4 pt-3 pb-3"
+          style={{ background: `linear-gradient(135deg, ${typeColor}18 0%, transparent 100%)`, borderBottom: `1px solid ${typeColor}33` }}
         >
           {/* Drag handle */}
-          <div className="w-10 h-1 bg-muted-foreground/20 rounded-full mx-auto mb-4" />
+          <div className="w-8 h-1 bg-muted-foreground/20 rounded-full mx-auto mb-3" />
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -270,10 +270,10 @@ function EventDetailSheet({
         </div>
 
         {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
 
           {/* ── READ VIEW: meta info ── always shown */}
-          <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3 text-sm">
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 text-sm">
             {event.sourceUrl && (
               <div className="flex items-start gap-2">
                 <Link2 size={13} className="text-muted-foreground mt-0.5 shrink-0" />
@@ -338,7 +338,7 @@ function EventDetailSheet({
 
           {/* Sales notes read view */}
           {!editMode && (event as any).salesNotes && (
-            <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/30 p-4">
+            <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/30 p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <NotebookPen size={13} className="text-blue-600 dark:text-blue-400" />
                 <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Post-Event Sales Notes</span>
@@ -349,7 +349,7 @@ function EventDetailSheet({
 
           {/* ── EDIT FORM — only in edit mode */}
           {editMode && (
-            <div className="space-y-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+            <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <p className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-1.5">
                 <Pencil size={11} /> Edit Event Details
               </p>
