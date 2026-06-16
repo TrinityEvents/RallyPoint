@@ -14,7 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn } from "@/lib/utils";
 import {
   CalendarDays, MapPin, Link2, User, Clock, ExternalLink,
-  Pencil, Trash2, Plus, Filter, CheckCircle2, XCircle, Clock3, RotateCcw
+  Pencil, Trash2, Plus, Filter, CheckCircle2, XCircle, Clock3, RotateCcw,
+  LayoutList, CalendarRange, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -300,12 +301,12 @@ function EventCard({ event }: { event: Event }) {
         <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-base leading-snug mb-1">{event.title}</h3>
 
         {/* Date + time */}
-        <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
-          <span className="flex items-center gap-1.5">
+        <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <span className="flex items-center gap-1.5 bg-primary/10 dark:bg-primary/20 text-primary font-semibold text-sm px-2.5 py-1 rounded-lg">
             <CalendarDays size={13} />
             {formatDate(event.eventDate)}
           </span>
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Clock size={13} />
             {formatTime(event.startTime)} – {formatTime(event.endTime)}
           </span>
@@ -400,10 +401,123 @@ type TypeFilter = "All" | typeof EVENT_TYPES[number];
 type AttendeeFilter = "All" | "Ryan" | "Connie" | "Both";
 type ViewMode = "upcoming" | "all";
 
+type DisplayMode = "list" | "calendar";
+
+// --- Calendar View Color Map ---
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  "Chamber":          "#2563FF",
+  "Networking":       "#8B5CF6",
+  "Job Fair":         "#00D4FF",
+  "Trade Show":       "#FF9F1C",
+  "Client Visit":     "#FF5C7A",
+  "Prospect Meeting": "#10b981",
+  "Other":            "#64748B",
+};
+
+function CalendarView({ events }: { events: Event[] }) {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const monthName = new Date(year, month, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrev = new Date(year, month, 0).getDate();
+
+  const byDate: Record<string, Event[]> = {};
+  events.forEach(e => {
+    if (!byDate[e.eventDate]) byDate[e.eventDate] = [];
+    byDate[e.eventDate].push(e);
+  });
+
+  const cells: { day: number; currentMonth: boolean; dateStr: string }[] = [];
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const d = daysInPrev - i;
+    const mo = month === 0 ? 12 : month;
+    const yr = month === 0 ? year - 1 : year;
+    cells.push({ day: d, currentMonth: false, dateStr: `${yr}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}` });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, currentMonth: true, dateStr: `${year}-${String(month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}` });
+  }
+  const remaining = 42 - cells.length;
+  for (let d = 1; d <= remaining; d++) {
+    const mo = month === 11 ? 1 : month + 2;
+    const yr = month === 11 ? year + 1 : year;
+    cells.push({ day: d, currentMonth: false, dateStr: `${yr}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}` });
+  }
+
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <button
+          onClick={() => { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); }}
+          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-muted-foreground transition-colors"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{monthName}</span>
+        <button
+          onClick={() => { if (month === 11) { setMonth(0); setYear(y => y+1); } else setMonth(m => m+1); }}
+          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-muted-foreground transition-colors"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-700">
+        {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+          <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-2">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7">
+        {cells.map((cell, idx) => {
+          const cellEvents = byDate[cell.dateStr] ?? [];
+          const isToday = cell.dateStr === todayStr;
+          return (
+            <div
+              key={idx}
+              className={cn(
+                "min-h-[80px] p-1.5 border-r border-b border-slate-100 dark:border-slate-700/50",
+                !cell.currentMonth && "bg-slate-50/50 dark:bg-slate-900/30",
+                isToday && "bg-primary/5 dark:bg-primary/10"
+              )}
+            >
+              <div className={cn(
+                "text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full",
+                isToday ? "bg-primary text-white" : cell.currentMonth ? "text-slate-700 dark:text-slate-300" : "text-slate-300 dark:text-slate-600"
+              )}>
+                {cell.day}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {cellEvents.slice(0, 3).map(e => (
+                  <div
+                    key={e.id}
+                    title={e.title}
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded truncate text-white leading-tight"
+                    style={{ backgroundColor: EVENT_TYPE_COLORS[e.eventType] ?? "#64748B" }}
+                  >
+                    {e.title}
+                  </div>
+                ))}
+                {cellEvents.length > 3 && (
+                  <div className="text-[10px] text-muted-foreground pl-1">+{cellEvents.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function UpcomingPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("All");
   const [attendeeFilter, setAttendeeFilter] = useState<AttendeeFilter>("All");
   const [viewMode, setViewMode] = useState<ViewMode>("upcoming");
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("list");
 
   const { data: upcoming, isLoading: loadingUpcoming } = useQuery<Event[]>({
     queryKey: ["/api/events/upcoming"],
@@ -480,13 +594,40 @@ export default function UpcomingPage() {
               All Events
             </button>
           </div>
-          <Link href="/add">
-            <a>
-              <Button size="sm" className="gap-1.5 bg-primary text-primary-foreground" data-testid="btn-add-event-shortcut">
-                <Plus size={14} /> Add Event
-              </Button>
-            </a>
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* List / Calendar display toggle */}
+            <div className="flex gap-0.5 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => setDisplayMode("list")}
+                data-testid="display-list"
+                title="List view"
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  displayMode === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutList size={15} />
+              </button>
+              <button
+                onClick={() => setDisplayMode("calendar")}
+                data-testid="display-calendar"
+                title="Calendar view"
+                className={cn(
+                  "p-1.5 rounded-md transition-colors",
+                  displayMode === "calendar" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <CalendarRange size={15} />
+              </button>
+            </div>
+            <Link href="/add">
+              <a>
+                <Button size="sm" className="gap-1.5 bg-primary text-primary-foreground" data-testid="btn-add-event-shortcut">
+                  <Plus size={14} /> Add Event
+                </Button>
+              </a>
+            </Link>
+          </div>
         </div>
 
         {/* Type filters */}
@@ -539,8 +680,10 @@ export default function UpcomingPage() {
         </div>
       </div>
 
-      {/* Event list */}
-      {isLoading ? (
+      {/* Calendar or List */}
+      {displayMode === "calendar" ? (
+        <CalendarView events={filtered} />
+      ) : isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-40 w-full rounded-xl" />
@@ -579,3 +722,4 @@ export default function UpcomingPage() {
     </div>
   );
 }
+
