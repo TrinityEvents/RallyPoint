@@ -394,7 +394,8 @@ function EventCard({ event }: { event: Event }) {
           <div className="flex items-center gap-1">
             <a
               href={`/api/events/${event.id}/ics`}
-              download
+              target="_blank"
+              rel="noopener noreferrer"
               className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
               data-testid={`btn-ics-${event.id}`}
               aria-label="Add to calendar"
