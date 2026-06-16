@@ -14,9 +14,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   CalendarDays, MapPin, Link2, User, Clock, ExternalLink,
   Pencil, Trash2, Plus, Filter, CheckCircle2, XCircle, Clock3, RotateCcw,
-  LayoutList, CalendarRange, ChevronLeft, ChevronRight, NotebookPen, CalendarPlus
+  LayoutList, CalendarRange, ChevronLeft, ChevronRight, NotebookPen, CalendarPlus, Download
 } from "lucide-react";
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -100,6 +104,43 @@ function SourceIcon({ platform }: { platform: string }) {
       {labels[platform] ?? platform}
     </span>
   );
+}
+
+// ─── Calendar URL helpers ──────────────────────────────────────────────────
+
+function toCalDT(date: string, time: string) {
+  // Returns YYYYMMDDTHHmmss for use in calendar URLs
+  const [y, mo, d] = date.split("-");
+  const [h, m] = (time || "09:00").split(":");
+  return `${y}${mo}${d}T${h}${m}00`;
+}
+
+function googleCalUrl(event: Event): string {
+  const start = toCalDT(event.eventDate, event.startTime);
+  const end   = toCalDT(event.eventDate, event.endTime);
+  const p = new URLSearchParams({
+    action: "TEMPLATE",
+    text:   event.title,
+    dates:  `${start}/${end}`,
+    details: event.notes ?? "",
+    location: event.location ?? "",
+  });
+  return `https://calendar.google.com/calendar/render?${p.toString()}`;
+}
+
+function outlookWebUrl(event: Event): string {
+  const startISO = `${event.eventDate}T${event.startTime || "09:00"}:00`;
+  const endISO   = `${event.eventDate}T${event.endTime   || "10:00"}:00`;
+  const p = new URLSearchParams({
+    path:      "/calendar/action/compose",
+    rru:       "addevent",
+    subject:   event.title,
+    startdt:   startISO,
+    enddt:     endISO,
+    body:      event.notes ?? "",
+    location:  event.location ?? "",
+  });
+  return `https://outlook.live.com/calendar/0/action/compose?${p.toString()}`;
 }
 
 // ─── Edit Modal ────────────────────────────────────────────────────────────
@@ -392,17 +433,41 @@ function EventCard({ event }: { event: Event }) {
             )}
           </div>
           <div className="flex items-center gap-1">
-            <a
-              href={`/api/events/${event.id}/ics`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              data-testid={`btn-ics-${event.id}`}
-              aria-label="Add to calendar"
-              title="Add to Outlook / Google Calendar"
-            >
-              <CalendarPlus size={13} />
-            </a>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  data-testid={`btn-ics-${event.id}`}
+                  aria-label="Add to calendar"
+                  title="Add to calendar"
+                >
+                  <CalendarPlus size={13} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs">Add to Calendar</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a href={googleCalUrl(event)} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                    <CalendarPlus size={13} className="mr-2 text-blue-500" />
+                    Google Calendar
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={outlookWebUrl(event)} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                    <CalendarPlus size={13} className="mr-2 text-blue-700" />
+                    Outlook (web)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a href={`/api/events/${event.id}/ics`} download className="cursor-pointer">
+                    <Download size={13} className="mr-2 text-muted-foreground" />
+                    Download .ics file
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               onClick={() => setEditing(true)}
               className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
