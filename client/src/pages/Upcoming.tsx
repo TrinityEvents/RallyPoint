@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import {
   CalendarDays, MapPin, Link2, User, Clock, ExternalLink,
   Pencil, Trash2, Plus, Filter, CheckCircle2, XCircle, Clock3, RotateCcw,
-  LayoutList, CalendarRange, ChevronLeft, ChevronRight, NotebookPen
+  LayoutList, CalendarRange, ChevronLeft, ChevronRight, NotebookPen, CalendarPlus
 } from "lucide-react";
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -392,6 +392,16 @@ function EventCard({ event }: { event: Event }) {
             )}
           </div>
           <div className="flex items-center gap-1">
+            <a
+              href={`/api/events/${event.id}/ics`}
+              download
+              className="p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              data-testid={`btn-ics-${event.id}`}
+              aria-label="Add to calendar"
+              title="Add to Outlook / Google Calendar"
+            >
+              <CalendarPlus size={13} />
+            </a>
             <button
               onClick={() => setEditing(true)}
               className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

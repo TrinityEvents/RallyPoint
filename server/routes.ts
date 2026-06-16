@@ -481,6 +481,80 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // GET /api/events/:id/ics — download event as .ics calendar file
+  app.get("/api/events/:id/ics", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const event = storage.getEventById(id);
+      if (!event) return res.status(404).json({ error: "Event not found" });
+
+      // Build iCalendar timestamps
+      // eventDate is YYYY-MM-DD, startTime/endTime are HH:MM
+      const toICS = (date: string, time: string): string => {
+        // Format: 20260630T180000 (local time, no Z = floating/local)
+        const [y, mo, d] = date.split("-");
+        const [h, m] = time.split(":");
+        return `${y}${mo}${d}T${h}${m}00`;
+      };
+
+      const dtStart = toICS(event.eventDate, event.startTime || "09:00");
+      const dtEnd   = toICS(event.eventDate, event.endTime   || "10:00");
+      const now     = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+      // Escape special chars per RFC 5545
+      const esc = (s: string) =>
+        (s ?? "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+
+      // Fold long lines at 75 octets per RFC 5545
+      const fold = (line: string): string => {
+        if (line.length <= 75) return line;
+        const chunks: string[] = [];
+        chunks.push(line.slice(0, 75));
+        let i = 75;
+        while (i < line.length) {
+          chunks.push(" " + line.slice(i, i + 74));
+          i += 74;
+        }
+        return chunks.join("\r\n");
+      };
+
+      const uid = `rallypoint-${event.id}-${Date.now()}@rallypoint.app`;
+      const description = [
+        event.notes          ? `Notes: ${event.notes}`       : "",
+        (event as any).salesNotes ? `Sales Notes: ${(event as any).salesNotes}` : "",
+        event.sourceUrl      ? `Source: ${event.sourceUrl}`  : "",
+        `Added by: ${event.addedBy}`,
+        `Attending: ${event.attending}`,
+      ].filter(Boolean).join("\n");
+
+      const lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//RallyPoint//RallyPoint 1.0//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "BEGIN:VEVENT",
+        fold(`UID:${uid}`),
+        fold(`DTSTAMP:${now}`),
+        fold(`DTSTART;TZID=America/Chicago:${dtStart}`),
+        fold(`DTEND;TZID=America/Chicago:${dtEnd}`),
+        fold(`SUMMARY:${esc(event.title)}`),
+        event.location ? fold(`LOCATION:${esc(event.location)}`) : "",
+        description    ? fold(`DESCRIPTION:${esc(description)}`)  : "",
+        event.sourceUrl ? fold(`URL:${event.sourceUrl}`) : "",
+        "END:VEVENT",
+        "END:VCALENDAR",
+      ].filter(s => s !== "").join("\r\n");
+
+      const slug = event.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+      res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${slug}.ics"`);
+      res.send(lines);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to generate calendar file" });
+    }
+  });
+
   // DELETE /api/events/:id
   app.delete("/api/events/:id", (req, res) => {
     try {
