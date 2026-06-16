@@ -4,11 +4,12 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { useState, useEffect } from "react";
-import { CalendarCheck, Plus, Moon, Sun, Bookmark, Settings } from "lucide-react";
+import { CalendarCheck, Plus, Moon, Sun, Bookmark, Settings, Users } from "lucide-react";
 import AddEventPage from "@/pages/AddEvent";
 import UpcomingPage from "@/pages/Upcoming";
 import BookmarkletPage from "@/pages/Bookmarklet";
 import SettingsPage from "@/pages/Settings";
+import ContactsPage from "@/pages/Contacts";
 import NotFound from "@/pages/not-found";
 
 function ThemeToggle() {
@@ -102,11 +103,12 @@ function Header() {
             <ThemeToggle />
           </div>
         </div>
-        <nav className="flex gap-0.5 -mb-px">
-          {navItem("/",        "Upcoming",  <CalendarCheck size={14} />, "/")}
-          {navItem("/add",     "Add Event", <Plus size={14} />)}
-          {navItem("/clipper", "Clipper",   <Bookmark size={14} />)}
-          {navItem("/settings","Settings",  <Settings size={14} />)}
+        <nav className="flex gap-0.5 -mb-px overflow-x-auto scrollbar-hide">
+          {navItem("/",         "Upcoming",  <CalendarCheck size={14} />, "/")}
+          {navItem("/add",      "Add Event", <Plus size={14} />)}
+          {navItem("/contacts", "Contacts",  <Users size={14} />)}
+          {navItem("/clipper",  "Clipper",   <Bookmark size={14} />)}
+          {navItem("/settings", "Settings",  <Settings size={14} />)}
         </nav>
       </div>
     </header>
@@ -121,6 +123,7 @@ function AppShell() {
         <Switch>
           <Route path="/" component={UpcomingPage} />
           <Route path="/add" component={AddEventPage} />
+          <Route path="/contacts" component={ContactsPage} />
           <Route path="/clipper" component={BookmarkletPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />

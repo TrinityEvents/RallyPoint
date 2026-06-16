@@ -76,6 +76,7 @@ export interface IStorage {
   updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined;
   deleteEvent(id: number): boolean;
   // Contacts
+  getAllContacts(): (Contact & { eventTitle: string; eventType: string; eventDate: string | null })[]; 
   getContactsByEvent(eventId: number): Contact[];
   createContact(data: InsertContact): Contact;
   updateContact(id: number, data: Partial<InsertContact>): Contact | undefined;
@@ -124,6 +125,15 @@ export const storage: IStorage = {
   },
 
   // ── Contacts ─────────────────────────────────────────────────────
+  getAllContacts() {
+    return sqlite.prepare(`
+      SELECT c.*, e.title as eventTitle, e.event_type as eventType, e.event_date as eventDate
+      FROM contacts c
+      LEFT JOIN events e ON c.event_id = e.id
+      ORDER BY c.created_at DESC
+    `).all() as (Contact & { eventTitle: string; eventType: string; eventDate: string | null })[];
+  },
+
   getContactsByEvent(eventId: number): Contact[] {
     return db.select().from(contacts).where(eq(contacts.eventId, eventId)).all();
   },

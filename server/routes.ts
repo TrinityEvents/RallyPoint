@@ -608,6 +608,17 @@ export function registerRoutes(httpServer: Server, app: Express) {
 
   // ── Contact routes ──────────────────────────────────────────────────
 
+  // GET /api/contacts — all contacts across all events
+  app.get("/api/contacts", (_req, res) => {
+    try {
+      const all = storage.getAllContacts();
+      res.json(all);
+    } catch (e) {
+      console.error("getAllContacts error:", e);
+      res.status(500).json({ error: "Failed to fetch contacts" });
+    }
+  });
+
   // GET /api/events/:id/contacts
   app.get("/api/events/:id/contacts", (req, res) => {
     try {
