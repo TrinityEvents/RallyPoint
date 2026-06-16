@@ -33,8 +33,9 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   "Networking":   "border-purple-500 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-600",
   "Job Fair":     "border-cyan-400 bg-cyan-50 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-500",
   "Trade Show":   "border-orange-400 bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-500",
-  "Client Visit": "border-pink-400 bg-pink-50 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-500",
-  "Other":        "border-slate-400 bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600",
+  "Client Visit":     "border-pink-400 bg-pink-50 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-500",
+  "Prospect Meeting": "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-600",
+  "Other":            "border-slate-400 bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600",
 };
 
 const ATTENDING_COLORS: Record<string, string> = {
@@ -105,6 +106,10 @@ export default function AddEventPage() {
   const [parseStatus, setParseStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const urlDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Text paste parser state
+  const [textSnippet, setTextSnippet] = useState("");
+  const [textParseStatus, setTextParseStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
   // Auto-parse when prefillUrl is present on mount
   useEffect(() => {
     if (prefillUrl) {
@@ -154,6 +159,26 @@ export default function AddEventPage() {
       setParseStatus("done");
     } catch (e) {
       setParseStatus("error");
+    }
+  }
+
+  async function triggerTextParse(text: string) {
+    if (!text.trim()) return;
+    setTextParseStatus("loading");
+    try {
+      const res = await apiRequest("POST", "/api/parse-text", { text });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.title && !form.getValues("title")) form.setValue("title", data.title);
+      if (data.eventDate) form.setValue("eventDate", data.eventDate);
+      if (data.startTime && !form.getValues("startTime")) form.setValue("startTime", data.startTime);
+      if (data.endTime && !form.getValues("endTime")) form.setValue("endTime", data.endTime);
+      if (data.location && !form.getValues("location")) form.setValue("location", data.location);
+      if (data.eventType && !form.getValues("eventType")) form.setValue("eventType", data.eventType);
+      if (data.sourcePlatform) form.setValue("sourcePlatform", data.sourcePlatform);
+      setTextParseStatus("done");
+    } catch {
+      setTextParseStatus("error");
     }
   }
 
@@ -233,6 +258,48 @@ export default function AddEventPage() {
               </FormItem>
             )}
           />
+
+          {/* Text paste — LinkedIn / email copy-paste smart parser */}
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 space-y-2">
+            <label className="text-sm font-medium flex items-center gap-1.5">
+              <FileText size={13} className="text-primary" />
+              Paste Event Text
+              <span className="text-xs font-normal text-muted-foreground ml-1">— copy from LinkedIn, email, etc.</span>
+            </label>
+            <Textarea
+              value={textSnippet}
+              onChange={e => setTextSnippet(e.target.value)}
+              rows={3}
+              placeholder="Paste the event post text here… dates, location, and title will be auto-extracted."
+              className="text-sm resize-none"
+              data-testid="textarea-text-snippet"
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => triggerTextParse(textSnippet)}
+                disabled={!textSnippet.trim() || textParseStatus === "loading"}
+                className="gap-1.5"
+                data-testid="btn-parse-text"
+              >
+                {textParseStatus === "loading" ? (
+                  <><Loader2 size={12} className="animate-spin" /> Extracting...</>
+                ) : (
+                  <><Sparkles size={12} className="text-primary" /> Extract Details</>
+                )}
+              </Button>
+              {textParseStatus === "done" && (
+                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <CheckCircle2 size={12} /> Fields filled — review below
+                </span>
+              )}
+              {textParseStatus === "error" && (
+                <span className="text-xs text-red-500">Couldn’t extract details. Fill in manually.</span>
+              )}
+            </div>
+          </div>
 
           <div className="border-t border-border/50 pt-1" />
 

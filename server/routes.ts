@@ -50,6 +50,112 @@ function fetchUrl(url: string): Promise<string> {
   });
 }
 
+// ──────────────────────────────────────────────────
+// Smart date extractor — works on raw text (LinkedIn paste etc.)
+// Priority: explicit year > current/next year heuristic
+// Returns YYYY-MM-DD or empty string
+// ──────────────────────────────────────────────────
+const MONTH_MAP: Record<string, number> = {
+  january:1, jan:1, february:2, feb:2, march:3, mar:3,
+  april:4, apr:4, may:5, june:6, jun:6, july:7, jul:7,
+  august:8, aug:8, september:9, sep:9, sept:9,
+  october:10, oct:10, november:11, nov:11, december:12, dec:12,
+};
+
+function toISODate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+}
+
+function bestYear(month: number, day: number): number {
+  const now = new Date();
+  const y = now.getFullYear();
+  const candidate = new Date(y, month - 1, day);
+  // If that date is already in the past by more than 3 days, use next year
+  const diff = (candidate.getTime() - now.getTime()) / 86400000;
+  return diff < -3 ? y + 1 : y;
+}
+
+function extractDateFromText(text: string): string {
+  // Pattern 1: "June 30, 2026" / "Jun 30 2026" (with explicit year)
+  const withYear = /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(202\d)/gi;
+  let m = withYear.exec(text);
+  if (m) {
+    const mo = MONTH_MAP[m[1].toLowerCase()];
+    const day = parseInt(m[2]);
+    const yr = parseInt(m[3]);
+    if (mo && day >= 1 && day <= 31) return toISODate(yr, mo, day);
+  }
+
+  // Pattern 2: ISO "2026-06-30"
+  const iso = /\b(202\d)-(\d{2})-(\d{2})\b/.exec(text);
+  if (iso) {
+    const yr = parseInt(iso[1]), mo = parseInt(iso[2]), day = parseInt(iso[3]);
+    if (mo >= 1 && mo <= 12 && day >= 1 && day <= 31) return toISODate(yr, mo, day);
+  }
+
+  // Pattern 3: MM/DD/YYYY
+  const slashFull = /\b(\d{1,2})\/(\d{1,2})\/(202\d)\b/.exec(text);
+  if (slashFull) {
+    const mo = parseInt(slashFull[1]), day = parseInt(slashFull[2]), yr = parseInt(slashFull[3]);
+    if (mo >= 1 && mo <= 12 && day >= 1 && day <= 31) return toISODate(yr, mo, day);
+  }
+
+  // Pattern 4: "June 30" or "Jun 30" — no year, infer from context
+  const noYear = /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b/gi;
+  let best: string | null = null;
+  let nm: RegExpExecArray | null;
+  noYear.lastIndex = 0;
+  while ((nm = noYear.exec(text)) !== null) {
+    const mo = MONTH_MAP[nm[1].toLowerCase()];
+    const day = parseInt(nm[2]);
+    if (mo && day >= 1 && day <= 31) {
+      const yr = bestYear(mo, day);
+      best = toISODate(yr, mo, day);
+      break; // take first good match
+    }
+  }
+  if (best) return best;
+
+  // Pattern 5: MM/DD or M/D — no year
+  const slashShort = /\b(\d{1,2})\/(\d{1,2})\b/.exec(text);
+  if (slashShort) {
+    const mo = parseInt(slashShort[1]), day = parseInt(slashShort[2]);
+    if (mo >= 1 && mo <= 12 && day >= 1 && day <= 31) {
+      return toISODate(bestYear(mo, day), mo, day);
+    }
+  }
+
+  return "";
+}
+
+function extractTimeFromText(text: string): { startTime: string; endTime: string } {
+  let startTime = "";
+  let endTime = "";
+  // "6:00 PM – 8:00 PM" or "6 PM - 8:00 PM"
+  const rangeMatch = text.match(
+    /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\s*[\-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i
+  );
+  if (rangeMatch) {
+    const toHH = (h: string, m: string, ap: string) => {
+      let hr = parseInt(h);
+      if (ap.toLowerCase() === "pm" && hr < 12) hr += 12;
+      if (ap.toLowerCase() === "am" && hr === 12) hr = 0;
+      return `${String(hr).padStart(2,"0")}:${(m ?? "00").padStart(2,"0")}`;
+    };
+    startTime = toHH(rangeMatch[1], rangeMatch[2], rangeMatch[3]);
+    endTime = toHH(rangeMatch[4], rangeMatch[5], rangeMatch[6]);
+  } else {
+    const single = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    if (single) {
+      let h = parseInt(single[1]);
+      if (single[3].toLowerCase() === "pm" && h < 12) h += 12;
+      if (single[3].toLowerCase() === "am" && h === 12) h = 0;
+      startTime = `${String(h).padStart(2,"0")}:${(single[2] ?? "00").padStart(2,"0")}`;
+    }
+  }
+  return { startTime, endTime };
+}
+
 function parseEventFromHtml(html: string, url: string) {
   const $ = cheerio.load(html);
 
@@ -153,30 +259,12 @@ function parseEventFromHtml(html: string, url: string) {
   // Heuristic text scan
   if (!eventDate) {
     const bodyText = $("body").text();
-    const datePatterns = [
-      /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(202\d)/gi,
-      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2}),?\s+(202\d)/gi,
-      /\b(202\d)-(\d{2})-(\d{2})\b/g,
-      /\b(\d{1,2})\/(\d{1,2})\/(202\d)\b/g,
-    ];
-    for (const pat of datePatterns) {
-      const match = bodyText.match(pat);
-      if (match) {
-        const d = new Date(match[0]);
-        if (!isNaN(d.getTime())) {
-          eventDate = d.toISOString().split("T")[0];
-          break;
-        }
-      }
-    }
+    eventDate = extractDateFromText(bodyText);
     // Time heuristic
-    const timeMatch = bodyText.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-    if (timeMatch && !startTime) {
-      const [, hr, min = "00", ampm] = timeMatch;
-      let h = parseInt(hr);
-      if (ampm.toLowerCase() === "pm" && h < 12) h += 12;
-      if (ampm.toLowerCase() === "am" && h === 12) h = 0;
-      startTime = `${String(h).padStart(2, "0")}:${min}`;
+    if (!startTime) {
+      const times = extractTimeFromText(bodyText);
+      startTime = times.startTime;
+      if (!endTime) endTime = times.endTime;
     }
   }
 
@@ -256,6 +344,53 @@ export function registerRoutes(httpServer: Server, app: Express) {
       res.json({ ok: true });
     } catch (err: any) {
       res.json({ ok: false, error: err?.message });
+    }
+  });
+
+  // POST /api/parse-text — extract event details from raw pasted text (LinkedIn, email, etc.)
+  app.post("/api/parse-text", (req, res) => {
+    try {
+      const { text } = req.body;
+      if (!text || typeof text !== "string") {
+        return res.status(400).json({ error: "text is required" });
+      }
+      const t = text.slice(0, 8000); // cap at 8k chars
+
+      // Title — first non-blank line that looks like an event name (< 120 chars)
+      const lines = t.split(/\n/).map(l => l.trim()).filter(Boolean);
+      let title = "";
+      for (const line of lines) {
+        if (line.length > 5 && line.length < 120 && !/^https?:\/\//.test(line)) {
+          title = line;
+          break;
+        }
+      }
+
+      // Date / Time
+      const eventDate = extractDateFromText(t);
+      const { startTime, endTime } = extractTimeFromText(t);
+
+      // Location — look for venue/location labels
+      let location = "";
+      const locMatch = t.match(/(?:location|venue|where|address)[:\s]+([^\n,]+(?:,\s*[^\n,]+)?)/i);
+      if (locMatch) location = locMatch[1].trim().slice(0, 100);
+
+      // Event type heuristic
+      const combined = t.toLowerCase();
+      let eventType = "";
+      if (/chamber|association/.test(combined)) eventType = "Chamber";
+      else if (/job fair|career fair|hiring event/.test(combined)) eventType = "Job Fair";
+      else if (/trade show|expo|conference/.test(combined)) eventType = "Trade Show";
+      else if (/network|mixer|happy hour|connect/.test(combined)) eventType = "Networking";
+
+      // Source platform
+      let sourcePlatform = "manual";
+      if (/linkedin/.test(combined)) sourcePlatform = "linkedin";
+      else if (/chamber/.test(combined)) sourcePlatform = "chamber";
+
+      res.json({ title, eventDate, startTime, endTime, location, eventType, sourcePlatform, notes: "" });
+    } catch (err: any) {
+      res.status(422).json({ error: "Could not parse text", detail: err?.message });
     }
   });
 

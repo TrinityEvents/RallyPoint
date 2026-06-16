@@ -38,6 +38,7 @@ sqlite.exec(`
     added_by TEXT NOT NULL,
     attending TEXT NOT NULL,
     notes TEXT,
+    sales_notes TEXT,
     reminder_minutes INTEGER,
     status TEXT NOT NULL DEFAULT 'upcoming',
     outlook_web_link TEXT,
@@ -46,6 +47,9 @@ sqlite.exec(`
     updated_at TEXT NOT NULL
   )
 `);
+
+// ── Migrations: add columns to existing DB if missing ──────────────────────
+try { sqlite.exec(`ALTER TABLE events ADD COLUMN sales_notes TEXT`); } catch { /* column already exists */ }
 
 export interface IStorage {
   getAllEvents(): Event[];

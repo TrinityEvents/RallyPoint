@@ -12,10 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import {
   CalendarDays, MapPin, Link2, User, Clock, ExternalLink,
   Pencil, Trash2, Plus, Filter, CheckCircle2, XCircle, Clock3, RotateCcw,
-  LayoutList, CalendarRange, ChevronLeft, ChevronRight
+  LayoutList, CalendarRange, ChevronLeft, ChevronRight, NotebookPen
 } from "lucide-react";
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -114,8 +115,10 @@ function EditModal({
 }) {
   const { toast } = useToast();
   const [notes, setNotes] = useState(event.notes ?? "");
+  const [salesNotes, setSalesNotes] = useState((event as any).salesNotes ?? "");
   const [attending, setAttending] = useState(event.attending);
   const [status, setStatus] = useState(event.status);
+  const [eventDate, setEventDate] = useState(event.eventDate);
 
   const ATTENDING_COLORS: Record<string, string> = {
     "Ryan":      "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600",
@@ -125,7 +128,7 @@ function EditModal({
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data: { notes: string; attending: string; status: string }) =>
+    mutationFn: (data: { notes: string; salesNotes: string; attending: string; status: string; eventDate: string }) =>
       apiRequest("PATCH", `/api/events/${event.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
@@ -142,7 +145,7 @@ function EditModal({
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">{event.title}</DialogTitle>
           <p className="text-sm text-muted-foreground">
-            {formatDate(event.eventDate)} · {formatTime(event.startTime)} – {formatTime(event.endTime)}
+            {formatDate(eventDate)} · {formatTime(event.startTime)} – {formatTime(event.endTime)}
           </p>
         </DialogHeader>
 
@@ -173,6 +176,19 @@ function EditModal({
               <span className="mx-1">·</span>
               <SourceIcon platform={event.sourcePlatform} />
             </div>
+          </div>
+
+          {/* Event Date correction */}
+          <div>
+            <label className="text-sm font-medium mb-1.5 block flex items-center gap-1.5">
+              <CalendarDays size={13} className="text-primary" /> Event Date
+            </label>
+            <Input
+              type="date"
+              value={eventDate}
+              onChange={e => setEventDate(e.target.value)}
+              data-testid="edit-event-date"
+            />
           </div>
 
           {/* Status */}
@@ -225,12 +241,28 @@ function EditModal({
               data-testid="edit-notes"
             />
           </div>
+
+          {/* Post-Event Sales Notes */}
+          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/30 p-3">
+            <label className="text-sm font-semibold mb-1.5 flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
+              <NotebookPen size={13} /> Post-Event Sales Notes
+            </label>
+            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mb-2">After attending, enter key takeaways, leads, and follow-ups here.</p>
+            <Textarea
+              value={salesNotes}
+              onChange={(e) => setSalesNotes(e.target.value)}
+              rows={4}
+              placeholder="Who did you meet? Any hot leads? Follow-up actions? Useful for next year..."
+              className="bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400"
+              data-testid="edit-sales-notes"
+            />
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} data-testid="btn-cancel-edit">Cancel</Button>
           <Button
-            onClick={() => updateMutation.mutate({ notes, attending, status })}
+            onClick={() => updateMutation.mutate({ notes, salesNotes, attending, status, eventDate })}
             disabled={updateMutation.isPending}
             data-testid="btn-save-edit"
           >
@@ -322,9 +354,20 @@ function EventCard({ event }: { event: Event }) {
 
         {/* Notes preview */}
         {event.notes && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3 pl-0 border-l-2 border-muted pl-2">
+          <p className="text-sm text-muted-foreground line-clamp-2 mb-3 border-l-2 border-muted pl-2">
             {event.notes}
           </p>
+        )}
+
+        {/* Sales Notes (post-event debrief) */}
+        {(event as any).salesNotes && (
+          <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/70 dark:bg-blue-950/30 px-3 py-2 mb-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <NotebookPen size={11} className="text-blue-600 dark:text-blue-400" />
+              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Sales Notes</span>
+            </div>
+            <p className="text-sm text-blue-800 dark:text-blue-200 line-clamp-3">{(event as any).salesNotes}</p>
+          </div>
         )}
 
         {/* Footer: meta + actions */}

@@ -8,6 +8,7 @@ export const EVENT_TYPES = [
   "Job Fair",
   "Trade Show",
   "Client Visit",
+  "Prospect Meeting",
   "Other",
 ] as const;
 
@@ -31,6 +32,7 @@ export const events = sqliteTable("events", {
   addedBy: text("added_by").notNull(),
   attending: text("attending").notNull(),
   notes: text("notes"),
+  salesNotes: text("sales_notes"),
   reminderMinutes: integer("reminder_minutes"),
   status: text("status").notNull().default("upcoming"),
   outlookWebLink: text("outlook_web_link"),
