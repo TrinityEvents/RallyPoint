@@ -4,12 +4,13 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { useState, useEffect } from "react";
-import { CalendarCheck, Plus, Moon, Sun, Bookmark, Settings, Users } from "lucide-react";
+import { CalendarCheck, Plus, Moon, Sun, Bookmark, Settings, Users, BarChart2 } from "lucide-react";
 import AddEventPage from "@/pages/AddEvent";
 import UpcomingPage from "@/pages/Upcoming";
 import BookmarkletPage from "@/pages/Bookmarklet";
 import SettingsPage from "@/pages/Settings";
 import ContactsPage from "@/pages/Contacts";
+import AccountabilityPage from "@/pages/Accountability";
 import NotFound from "@/pages/not-found";
 
 function ThemeToggle() {
@@ -106,7 +107,8 @@ function Header() {
         <nav className="flex gap-0.5 -mb-px overflow-x-auto scrollbar-hide">
           {navItem("/",         "Upcoming",  <CalendarCheck size={14} />, "/")}
           {navItem("/add",      "Add Event", <Plus size={14} />)}
-          {navItem("/contacts", "Contacts",  <Users size={14} />)}
+          {navItem("/contacts",      "Contacts",     <Users size={14} />)}
+          {navItem("/accountability", "Activity",     <BarChart2 size={14} />)}
           {navItem("/clipper",  "Clipper",   <Bookmark size={14} />)}
           {navItem("/settings", "Settings",  <Settings size={14} />)}
         </nav>
@@ -124,6 +126,7 @@ function AppShell() {
           <Route path="/" component={UpcomingPage} />
           <Route path="/add" component={AddEventPage} />
           <Route path="/contacts" component={ContactsPage} />
+          <Route path="/accountability" component={AccountabilityPage} />
           <Route path="/clipper" component={BookmarkletPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />

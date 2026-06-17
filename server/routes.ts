@@ -764,4 +764,107 @@ export function registerRoutes(httpServer: Server, app: Express) {
       res.status(500).json({ error: "Failed to delete event" });
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ACCOUNTABILITY ROUTES
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // GET /api/accountability/team — team-wide summary per rep
+  app.get("/api/accountability/team", (_req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const summary = accountabilityStorage.getTeamSummary();
+      res.json(summary);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load team summary" });
+    }
+  });
+
+  // GET /api/accountability/rep/:name — individual rep detail
+  app.get("/api/accountability/rep/:name", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const data = accountabilityStorage.getRepDetail(req.params.name);
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load rep detail" });
+    }
+  });
+
+  // GET /api/follow-ups — all or filtered by ?assignedTo=
+  app.get("/api/follow-ups", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const assignedTo = req.query.assignedTo as string | undefined;
+      const items = accountabilityStorage.getFollowUps(assignedTo);
+      res.json(items);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to load follow-ups" });
+    }
+  });
+
+  // POST /api/follow-ups
+  app.post("/api/follow-ups", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const item = accountabilityStorage.createFollowUp(req.body);
+      res.status(201).json(item);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to create follow-up" });
+    }
+  });
+
+  // PATCH /api/follow-ups/:id
+  app.patch("/api/follow-ups/:id", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const id = parseInt(req.params.id);
+      const updated = accountabilityStorage.updateFollowUp(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Follow-up not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update follow-up" });
+    }
+  });
+
+  // POST /api/attendance
+  app.post("/api/attendance", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const record = accountabilityStorage.logAttendance(req.body);
+      res.status(201).json(record);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to log attendance" });
+    }
+  });
+
+  // PATCH /api/attendance/:id
+  app.patch("/api/attendance/:id", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const id = parseInt(req.params.id);
+      const updated = accountabilityStorage.updateAttendance(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Attendance record not found" });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update attendance" });
+    }
+  });
+
+  // POST /api/crm-exports — log an export event
+  app.post("/api/crm-exports", (req, res) => {
+    try {
+      const { accountabilityStorage } = require("./storage");
+      const record = accountabilityStorage.logCrmExport({
+        exportedBy: req.body.exportedBy,
+        exportType: req.body.exportType || "csv",
+        contactCount: req.body.contactCount || 0,
+        exportedAt: new Date().toISOString(),
+      });
+      res.status(201).json(record);
+    } catch (err) {
+      res.status(500).json({ error: "Failed to log export" });
+    }
+  });
+
 }

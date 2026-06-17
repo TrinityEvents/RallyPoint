@@ -205,3 +205,164 @@ export const storage: IStorage = {
     return result.changes > 0;
   },
 };
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ACCOUNTABILITY — DB SETUP + STORAGE METHODS
+// ══════════════════════════════════════════════════════════════════════════════
+
+import {
+  attendanceLog, followUps, crmExports,
+  type AttendanceRecord, type InsertAttendance,
+  type FollowUp, type InsertFollowUp,
+  type CrmExport, type InsertCrmExport,
+} from "@shared/schema";
+
+// Create tables
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS attendance_log (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id           INTEGER NOT NULL,
+    user_name          TEXT NOT NULL,
+    planned            INTEGER NOT NULL DEFAULT 1,
+    attended           INTEGER NOT NULL DEFAULT 0,
+    check_in_at        TEXT,
+    contacts_captured  INTEGER NOT NULL DEFAULT 0,
+    note               TEXT,
+    created_at         TEXT NOT NULL
+  )
+`);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS follow_ups (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id   INTEGER NOT NULL,
+    assigned_to  TEXT NOT NULL,
+    due_date     TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'pending',
+    completed_at TEXT,
+    note         TEXT,
+    created_at   TEXT NOT NULL
+  )
+`);
+
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS crm_exports (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    exported_by   TEXT NOT NULL,
+    export_type   TEXT NOT NULL DEFAULT 'csv',
+    contact_count INTEGER NOT NULL DEFAULT 0,
+    exported_at   TEXT NOT NULL
+  )
+`);
+
+// ── Accountability storage methods ──────────────────────────────────────────
+
+export const accountabilityStorage = {
+  // --- Attendance ---
+  logAttendance(data: InsertAttendance): AttendanceRecord {
+    const now = new Date().toISOString();
+    return db.insert(attendanceLog).values({ ...data, createdAt: now }).returning().get();
+  },
+
+  updateAttendance(id: number, data: Partial<InsertAttendance>): AttendanceRecord | undefined {
+    return db.update(attendanceLog).set(data).where(eq(attendanceLog.id, id)).returning().get();
+  },
+
+  getAttendanceByEvent(eventId: number): AttendanceRecord[] {
+    return db.select().from(attendanceLog).where(eq(attendanceLog.eventId, eventId)).all();
+  },
+
+  // --- Team summary: per-rep aggregated stats ---
+  getTeamSummary(): Array<{
+    userName: string;
+    eventsPlanned: number;
+    eventsAttended: number;
+    contactsCaptured: number;
+    followUpTotal: number;
+    followUpDone: number;
+    crmExports: number;
+  }> {
+    const attendance = sqlite.prepare(`
+      SELECT
+        user_name           AS userName,
+        SUM(planned)        AS eventsPlanned,
+        SUM(attended)       AS eventsAttended,
+        SUM(contacts_captured) AS contactsCaptured
+      FROM attendance_log
+      GROUP BY user_name
+    `).all() as { userName: string; eventsPlanned: number; eventsAttended: number; contactsCaptured: number }[];
+
+    const followUpsByRep = sqlite.prepare(`
+      SELECT
+        assigned_to           AS userName,
+        COUNT(*)              AS total,
+        SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done
+      FROM follow_ups
+      GROUP BY assigned_to
+    `).all() as { userName: string; total: number; done: number }[];
+
+    const exportsByRep = sqlite.prepare(`
+      SELECT exported_by AS userName, COUNT(*) AS cnt
+      FROM crm_exports GROUP BY exported_by
+    `).all() as { userName: string; cnt: number }[];
+
+    const fuMap = Object.fromEntries(followUpsByRep.map(r => [r.userName, r]));
+    const exMap = Object.fromEntries(exportsByRep.map(r => [r.userName, r]));
+
+    return attendance.map(row => ({
+      userName: row.userName,
+      eventsPlanned: row.eventsPlanned || 0,
+      eventsAttended: row.eventsAttended || 0,
+      contactsCaptured: row.contactsCaptured || 0,
+      followUpTotal: fuMap[row.userName]?.total || 0,
+      followUpDone: fuMap[row.userName]?.done || 0,
+      crmExports: exMap[row.userName]?.cnt || 0,
+    }));
+  },
+
+  // --- Rep detail ---
+  getRepDetail(userName: string): {
+    attendance: AttendanceRecord[];
+    followUps: FollowUp[];
+    exports: CrmExport[];
+  } {
+    const attendance = db.select().from(attendanceLog)
+      .where(eq(attendanceLog.userName, userName)).all();
+    const fus = db.select().from(followUps)
+      .where(eq(followUps.assignedTo, userName)).all();
+    const exps = db.select().from(crmExports)
+      .where(eq(crmExports.exportedBy, userName)).all();
+    return { attendance, followUps: fus, exports: exps };
+  },
+
+  // --- Follow-ups ---
+  createFollowUp(data: InsertFollowUp): FollowUp {
+    const now = new Date().toISOString();
+    return db.insert(followUps).values({ ...data, createdAt: now }).returning().get();
+  },
+
+  updateFollowUp(id: number, data: Partial<InsertFollowUp>): FollowUp | undefined {
+    return db.update(followUps).set(data).where(eq(followUps.id, id)).returning().get();
+  },
+
+  getFollowUps(assignedTo?: string): FollowUp[] {
+    if (assignedTo) {
+      return db.select().from(followUps).where(eq(followUps.assignedTo, assignedTo)).all();
+    }
+    return db.select().from(followUps).all();
+  },
+
+  getOverdueFollowUps(): FollowUp[] {
+    const today = new Date().toISOString().split("T")[0];
+    return sqlite.prepare(`
+      SELECT * FROM follow_ups
+      WHERE status != 'done' AND due_date < ?
+      ORDER BY due_date ASC
+    `).all(today) as FollowUp[];
+  },
+
+  // --- CRM exports ---
+  logCrmExport(data: InsertCrmExport): CrmExport {
+    return db.insert(crmExports).values(data).returning().get();
+  },
+};

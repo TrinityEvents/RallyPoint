@@ -80,3 +80,49 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
 
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+
+// ── Attendance Log ──────────────────────────────────────────────────────────
+export const attendanceLog = sqliteTable("attendance_log", {
+  id:               integer("id").primaryKey({ autoIncrement: true }),
+  eventId:          integer("event_id").notNull(),
+  userName:         text("user_name").notNull(),       // rep name
+  planned:          integer("planned").notNull().default(1),   // 1=yes, 0=no
+  attended:         integer("attended").notNull().default(0),  // 1=yes, 0=no
+  checkInAt:        text("check_in_at"),               // ISO timestamp
+  contactsCaptured: integer("contacts_captured").notNull().default(0),
+  note:             text("note"),
+  createdAt:        text("created_at").notNull(),
+});
+
+export const insertAttendanceSchema = createInsertSchema(attendanceLog).omit({ id: true, createdAt: true });
+export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
+export type AttendanceRecord = typeof attendanceLog.$inferSelect;
+
+// ── Follow-Ups ──────────────────────────────────────────────────────────────
+export const followUps = sqliteTable("follow_ups", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  contactId:   integer("contact_id").notNull(),
+  assignedTo:  text("assigned_to").notNull(),
+  dueDate:     text("due_date").notNull(),             // YYYY-MM-DD
+  status:      text("status").notNull().default("pending"), // pending | done | overdue
+  completedAt: text("completed_at"),
+  note:        text("note"),
+  createdAt:   text("created_at").notNull(),
+});
+
+export const insertFollowUpSchema = createInsertSchema(followUps).omit({ id: true, createdAt: true });
+export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
+export type FollowUp = typeof followUps.$inferSelect;
+
+// ── CRM Exports ─────────────────────────────────────────────────────────────
+export const crmExports = sqliteTable("crm_exports", {
+  id:           integer("id").primaryKey({ autoIncrement: true }),
+  exportedBy:   text("exported_by").notNull(),
+  exportType:   text("export_type").notNull().default("csv"), // csv | touchpoint | salesforce | hubspot
+  contactCount: integer("contact_count").notNull().default(0),
+  exportedAt:   text("exported_at").notNull(),
+});
+
+export const insertCrmExportSchema = createInsertSchema(crmExports).omit({ id: true });
+export type InsertCrmExport = z.infer<typeof insertCrmExportSchema>;
+export type CrmExport = typeof crmExports.$inferSelect;
