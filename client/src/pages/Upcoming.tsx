@@ -299,246 +299,210 @@ function EventDetailSheet({
         </div>
 
         {/* ── BODY ─────────────────────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
 
-          {/*
-            Responsive grid layout:
-            - No notes → single-column
-            - Has notes + not in edit mode → on md+ screens: left col = meta (fixed 200px),
-              right col = notes content. On mobile: stacked.
-            - Edit mode → always single column (form needs full width)
-          */}
-          <div className={cn(
-            !editMode && hasNotes
-              ? "sm:grid sm:grid-cols-[210px_1fr] sm:gap-x-4 space-y-3 sm:space-y-0"
-              : "space-y-3"
-          )}>
-
-            {/* ── LEFT / TOP: Meta card ── */}
-            <div className="space-y-3">
-              <div className="rounded-lg border border-border/50 bg-muted/15 divide-y divide-border/40">
-
-                {/* Source URL */}
-                {event.sourceUrl && (
-                  <div className="flex items-start gap-2 px-3 py-2">
-                    <Link2 size={11} className="text-muted-foreground mt-0.5 shrink-0" />
-                    <a
-                      href={event.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-primary hover:underline break-all leading-relaxed"
-                    >
-                      {event.sourceUrl}
-                    </a>
-                  </div>
-                )}
-
-                {/* Added by / platform */}
-                <div className="flex items-center gap-3 px-3 py-2 text-[11px] text-muted-foreground flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <User size={10} /> {event.addedBy}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <SourceIcon platform={event.sourcePlatform || "manual"} />
-                  </span>
-                </div>
-
-                {/* Add to calendar */}
-                <div className="px-3 py-1">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors min-h-[40px] w-full text-left">
-                        <CalendarPlus size={11} /> Add to Calendar
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-48">
-                      <DropdownMenuLabel className="text-xs">Add to Calendar</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <a href={googleCalUrl(event)} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
-                          <CalendarPlus size={13} className="mr-2 text-blue-500" /> Google Calendar
-                        </a>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <a href={outlookWebUrl(event)} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
-                          <CalendarPlus size={13} className="mr-2 text-blue-700" /> Outlook (web)
-                        </a>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <a href={`/api/events/${event.id}/ics`} download className="cursor-pointer">
-                          <Download size={13} className="mr-2 text-muted-foreground" /> Download .ics
-                        </a>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              {/* Contact Log sits in left col on desktop, below everything on mobile */}
-              <div className="hidden sm:block">
-                {!editMode && <ContactLog eventId={event.id} />}
-              </div>
-            </div>
-
-            {/* ── RIGHT / BOTTOM: Notes + Edit form ── */}
-            <div className="space-y-3">
-
-              {/* Notes read view */}
-              {!editMode && event.notes && (
-                <div>
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">Notes</p>
-                  <p className="text-[13px] text-slate-700 dark:text-slate-300 border-l-2 border-muted pl-3 leading-relaxed whitespace-pre-wrap">
-                    {event.notes}
-                  </p>
-                </div>
-              )}
-
-              {/* Sales notes read view */}
-              {!editMode && (event as any).salesNotes && (
-                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/25 px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <NotebookPen size={11} className="text-blue-600 dark:text-blue-400" />
-                    <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
-                      Post-Event Sales Notes
-                    </span>
-                  </div>
-                  <p className="text-[13px] text-blue-800 dark:text-blue-200 leading-relaxed whitespace-pre-wrap">
-                    {(event as any).salesNotes}
-                  </p>
-                </div>
-              )}
-
-              {/* Empty state — no notes, not editing */}
-              {!editMode && !hasNotes && (
-                <p className="text-[11px] text-muted-foreground/60 italic">No notes yet — tap Edit to add context.</p>
-              )}
-
-              {/* ── EDIT FORM ── */}
-              {editMode && (
-                <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
-                  <p className="text-[10px] font-semibold text-primary uppercase tracking-widest flex items-center gap-1.5">
-                    <Pencil size={10} /> Edit Details
-                  </p>
-
-                  {/* Date + Status — side by side */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Event Date</label>
-                      <Input
-                        type="date"
-                        value={eventDate}
-                        onChange={e => setEventDate(e.target.value)}
-                        className="h-8 text-sm"
-                        data-testid="edit-event-date"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Status</label>
-                      <Select value={status} onValueChange={setStatus}>
-                        <SelectTrigger data-testid="select-status" className="h-8 text-sm w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="upcoming">Upcoming</SelectItem>
-                          <SelectItem value="attended">Attended</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                          <SelectItem value="postponed">Postponed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Attending */}
-                  <div>
-                    <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Who's Attending</label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {ATTENDING_OPTIONS.map((opt) => (
-                        <button
-                          key={opt}
-                          type="button"
-                          onClick={() => setAttending(opt)}
-                          data-testid={`attending-toggle-${opt.toLowerCase()}`}
-                          className={cn(
-                            "px-2.5 py-1 rounded-md border text-[12px] font-medium transition-all",
-                            attending === opt
-                              ? (ATTENDING_COLORS[opt] ?? "") + " ring-1 ring-offset-1 ring-primary/30"
-                              : "border-border bg-background text-muted-foreground hover:border-primary/30"
-                          )}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  <div>
-                    <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
-                    <Textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      rows={3}
-                      placeholder="Opportunity context, contacts met, follow-up needed..."
-                      className="text-sm"
-                      data-testid="edit-notes"
-                    />
-                  </div>
-
-                  {/* Post-Event Sales Notes */}
-                  <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20 p-2.5">
-                    <label className="text-[11px] font-semibold mb-1 flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
-                      <NotebookPen size={11} /> Post-Event Sales Notes
-                    </label>
-                    <Textarea
-                      value={salesNotes}
-                      onChange={(e) => setSalesNotes(e.target.value)}
-                      rows={4}
-                      placeholder="Who did you meet? Hot leads? Follow-up actions?"
-                      className="text-sm bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400"
-                      data-testid="edit-sales-notes"
-                    />
-                  </div>
-
-                  {/* Save / Cancel */}
-                  <div className="flex gap-2 justify-end pt-0.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => {
-                        setEditMode(false);
-                        setNotes(event.notes ?? "");
-                        setSalesNotes((event as any).salesNotes ?? "");
-                        setAttending(event.attending);
-                        setStatus(event.status);
-                        setEventDate(event.eventDate);
-                      }}
-                      data-testid="btn-cancel-edit"
-                    >
-                      <X size={12} className="mr-1" /> Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={() => updateMutation.mutate({ notes, salesNotes, attending, status, eventDate })}
-                      disabled={updateMutation.isPending}
-                      data-testid="btn-save-edit"
-                    >
-                      <Save size={12} className="mr-1" />
-                      {updateMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Contact Log — mobile: below notes. Tablet/desktop: in left col */}
-              <div className="sm:hidden">
-                <ContactLog eventId={event.id} />
-              </div>
-            </div>
-
+          {/* ── META STRIP — compact single row ── */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 rounded-lg bg-muted/20 border border-border/50 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <User size={10} /> {event.addedBy}
+            </span>
+            <span className="text-border">·</span>
+            <SourceIcon platform={(event.sourcePlatform || "manual").toLowerCase()} />
+            {event.sourceUrl && (
+              <>
+                <span className="text-border">·</span>
+                <a
+                  href={event.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline truncate max-w-[240px] sm:max-w-none"
+                >
+                  <Link2 size={10} className="inline mr-0.5 -mt-0.5" />
+                  {event.sourceUrl.replace(/^https?:\/\//, "").split("?")[0]}
+                </a>
+              </>
+            )}
+            <span className="text-border">·</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors">
+                  <CalendarPlus size={11} /> Add to Calendar
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuLabel className="text-xs">Add to Calendar</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a href={googleCalUrl(event)} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                    <CalendarPlus size={13} className="mr-2 text-blue-500" /> Google Calendar
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={outlookWebUrl(event)} target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                    <CalendarPlus size={13} className="mr-2 text-blue-700" /> Outlook (web)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a href={`/api/events/${event.id}/ics`} download className="cursor-pointer">
+                    <Download size={13} className="mr-2 text-muted-foreground" /> Download .ics
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
+          {/* ── NOTES (read view) ── */}
+          {!editMode && event.notes && (
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">Notes</p>
+              <p className="text-[13px] text-slate-700 dark:text-slate-300 border-l-2 border-muted pl-3 leading-relaxed whitespace-pre-wrap">
+                {event.notes}
+              </p>
+            </div>
+          )}
+
+          {/* ── POST-EVENT SALES NOTES (read view) ── */}
+          {!editMode && (event as any).salesNotes && (
+            <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/25 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <NotebookPen size={11} className="text-blue-600 dark:text-blue-400" />
+                <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-widest">
+                  Post-Event Sales Notes
+                </span>
+              </div>
+              <p className="text-[13px] text-blue-800 dark:text-blue-200 leading-relaxed whitespace-pre-wrap">
+                {(event as any).salesNotes}
+              </p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!editMode && !hasNotes && (
+            <p className="text-[11px] text-muted-foreground/60 italic px-1">No notes yet — tap Edit to add context.</p>
+          )}
+
+          {/* ── EDIT FORM ── */}
+          {editMode && (
+            <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <p className="text-[10px] font-semibold text-primary uppercase tracking-widest flex items-center gap-1.5">
+                <Pencil size={10} /> Edit Details
+              </p>
+
+              {/* Date + Status side by side */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Event Date</label>
+                  <Input
+                    type="date"
+                    value={eventDate}
+                    onChange={e => setEventDate(e.target.value)}
+                    className="h-8 text-sm"
+                    data-testid="edit-event-date"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Status</label>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger data-testid="select-status" className="h-8 text-sm w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="upcoming">Upcoming</SelectItem>
+                      <SelectItem value="attended">Attended</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                      <SelectItem value="postponed">Postponed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Attending */}
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Who's Attending</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {ATTENDING_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setAttending(opt)}
+                      data-testid={`attending-toggle-${opt.toLowerCase()}`}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md border text-[12px] font-medium transition-all",
+                        attending === opt
+                          ? (ATTENDING_COLORS[opt] ?? "") + " ring-1 ring-offset-1 ring-primary/30"
+                          : "border-border bg-background text-muted-foreground hover:border-primary/30"
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground mb-1 block">Notes</label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Opportunity context, contacts met, follow-up needed..."
+                  className="text-sm"
+                  data-testid="edit-notes"
+                />
+              </div>
+
+              {/* Post-Event Sales Notes */}
+              <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-950/20 p-2.5">
+                <label className="text-[11px] font-semibold mb-1 flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
+                  <NotebookPen size={11} /> Post-Event Sales Notes
+                </label>
+                <Textarea
+                  value={salesNotes}
+                  onChange={(e) => setSalesNotes(e.target.value)}
+                  rows={4}
+                  placeholder="Who did you meet? Hot leads? Follow-up actions?"
+                  className="text-sm bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 focus-visible:ring-blue-400"
+                  data-testid="edit-sales-notes"
+                />
+              </div>
+
+              {/* Save / Cancel */}
+              <div className="flex gap-2 justify-end pt-0.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    setEditMode(false);
+                    setNotes(event.notes ?? "");
+                    setSalesNotes((event as any).salesNotes ?? "");
+                    setAttending(event.attending);
+                    setStatus(event.status);
+                    setEventDate(event.eventDate);
+                  }}
+                  data-testid="btn-cancel-edit"
+                >
+                  <X size={12} className="mr-1" /> Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => updateMutation.mutate({ notes, salesNotes, attending, status, eventDate })}
+                  disabled={updateMutation.isPending}
+                  data-testid="btn-save-edit"
+                >
+                  <Save size={12} className="mr-1" />
+                  {updateMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── CONTACT LOG — always single column, full width ── */}
+          <ContactLog eventId={event.id} />
+
         </div>
       </SheetContent>
     </Sheet>
