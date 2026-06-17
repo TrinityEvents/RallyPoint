@@ -13,8 +13,16 @@ import { cn } from "@/lib/utils";
 import {
   Users, Flame, Mail, Phone, ExternalLink,
   Download, Search, CheckSquare, Square, Copy,
-  Building2, Filter, ChevronDown,
+  Building2, Filter, ChevronDown, ChevronUp,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type GlobalContact = Contact & {
@@ -34,27 +42,20 @@ const TYPE_COLORS: Record<string, string> = {
   "Other":            "#64748B",
 };
 
-// ── CSV export ────────────────────────────────────────────────────────────────
-function toCSV(rows: GlobalContact[]): string {
-  const headers = ["Name","Title","Company","Email","Phone","LinkedIn","Hot Lead","Notes","Event","Event Type","Event Date"];
-  const lines = rows.map(c => [
-    c.name, c.title ?? "", c.company ?? "", c.email ?? "", c.phone ?? "",
-    c.linkedin ?? "", c.hotLead ? "Yes" : "No",
-    (c.notes ?? "").replace(/\n/g, " "),
-    c.eventTitle ?? "", c.eventType ?? "", c.eventDate ?? "",
-  ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
-  return [headers.join(","), ...lines].join("\n");
-}
+// ── CRM export helpers ────────────────────────────────────────────────────────
 
-function downloadCSV(rows: GlobalContact[], filename = "rallypoint-contacts.csv") {
-  const blob = new Blob([toCSV(rows)], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
+type ExportFormat = "csv" | "salesforce" | "hubspot" | "touchpoint";
+
+function exportViaServer(format: ExportFormat, ids?: number[]) {
+  const base = `/api/contacts/export/${format}`;
+  const url  = ids && ids.length > 0 ? `${base}?ids=${ids.join(",")}` : base;
+  // Trigger download via hidden anchor
   const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click();
-  URL.revokeObjectURL(url);
+  a.href = url;
+  a.click();
 }
 
-// ── Copy as tab-separated (TouchPoint / CRM paste) ───────────────────────────
+// Fallback: copy tab-separated to clipboard for TouchPoint paste
 function copyForCRM(rows: GlobalContact[]) {
   const headers = ["Name","Title","Company","Email","Phone","LinkedIn","Event","Event Date"];
   const lines = rows.map(c => [
@@ -241,11 +242,7 @@ export default function ContactsPage() {
   }
 
   function handleExportCSV() {
-    const rows = selectedContacts.length > 0 ? selectedContacts : filtered;
-    const label = selectedContacts.length > 0
-      ? `rallypoint-contacts-${rows.length}-selected.csv`
-      : "rallypoint-contacts-all.csv";
-    downloadCSV(rows, label);
+    exportViaServer("csv", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined);
   }
 
   const exportCount = selectedContacts.length > 0 ? selectedContacts.length : filtered.length;
@@ -266,29 +263,56 @@ export default function ContactsPage() {
           )}
         </div>
 
-        {/* Export / Copy actions */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs gap-1.5"
-            onClick={handleCopyForCRM}
-            disabled={contacts.length === 0}
-            title="Copy as tab-separated data for pasting into TouchPoint or any CRM spreadsheet"
-          >
-            <Copy size={12} />
-            {copied ? "Copied!" : `Copy${selectedContacts.length > 0 ? ` (${exportCount})` : " All"} for CRM`}
-          </Button>
-          <Button
-            size="sm"
-            className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground"
-            onClick={handleExportCSV}
-            disabled={contacts.length === 0}
-          >
-            <Download size={12} />
-            Export{selectedContacts.length > 0 ? ` (${exportCount})` : " All"} CSV
-          </Button>
-        </div>
+        {/* Export dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground"
+              disabled={contacts.length === 0}
+              data-testid="button-export-dropdown"
+            >
+              <Download size={12} />
+              Export{selectedContacts.length > 0 ? ` (${exportCount})` : ""}
+              <ChevronDown size={11} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+              {selectedContacts.length > 0 ? `${exportCount} selected contacts` : "All contacts"}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => exportViaServer("csv", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
+              data-testid="export-csv"
+            >
+              <Download size={13} className="mr-2" />
+              Generic CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => exportViaServer("salesforce", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
+              data-testid="export-salesforce"
+            >
+              <Download size={13} className="mr-2" />
+              Salesforce Leads
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => exportViaServer("hubspot", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
+              data-testid="export-hubspot"
+            >
+              <Download size={13} className="mr-2" />
+              HubSpot Contacts
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={handleCopyForCRM}
+              data-testid="export-touchpoint"
+            >
+              <Copy size={13} className="mr-2" />
+              {copied ? "Copied!" : "Copy for TouchPoint"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Search + filters */}
@@ -419,9 +443,20 @@ export default function ContactsPage() {
             <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={handleCopyForCRM}>
               <Copy size={12} /> {copied ? "Copied!" : "Copy for CRM"}
             </Button>
-            <Button size="sm" className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground" onClick={handleExportCSV}>
-              <Download size={12} /> Export CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground">
+                  <Download size={12} /> Export <ChevronDown size={11} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => exportViaServer("csv", selectedContacts.map(c => c.id))}>Generic CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportViaServer("salesforce", selectedContacts.map(c => c.id))}>Salesforce Leads</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportViaServer("hubspot", selectedContacts.map(c => c.id))}>HubSpot Contacts</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleCopyForCRM}>{copied ? "Copied!" : "Copy for TouchPoint"}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelected(new Set())}>
               Clear
             </Button>

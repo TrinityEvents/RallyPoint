@@ -859,4 +859,107 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CRM EXPORT ROUTES
+  // Each format is a GET that streams back a .csv file
+  // Optional query: ?ids=1,2,3  (omit = export all)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function getContactsForExport(idsParam?: string) {
+    const all = storage.getAllContacts();
+    if (!idsParam) return all;
+    const ids = new Set(idsParam.split(",").map(Number).filter(Boolean));
+    return all.filter(c => ids.has(c.id));
+  }
+
+  function csvRow(fields: (string | number | null | undefined)[]) {
+    return fields.map(f => {
+      const v = f == null ? "" : String(f);
+      const escaped = v.replace(/"/g, "''").replace(/\r?\n/g, " ");
+      return `"${escaped}"`;
+    }).join(",");
+  }
+
+  // GET /api/contacts/export/csv  — generic RallyPoint CSV
+  app.get("/api/contacts/export/csv", (req, res) => {
+    try {
+      const rows = getContactsForExport(req.query.ids as string);
+      const lines = [
+        csvRow(["Name","Title","Company","Email","Phone","LinkedIn","Hot Lead","Notes","Event","Event Type","Event Date"]),
+        ...rows.map(c => csvRow([
+          c.name, c.title, c.company, c.email, c.phone, c.linkedin,
+          c.hotLead ? "Yes" : "No", c.notes,
+          (c as any).eventTitle, (c as any).eventType, (c as any).eventDate,
+        ])),
+      ].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="rallypoint-contacts.csv"`);
+      res.send(lines);
+    } catch { res.status(500).json({ error: "Export failed" }); }
+  });
+
+  // GET /api/contacts/export/salesforce  — Salesforce Lead import format
+  app.get("/api/contacts/export/salesforce", (req, res) => {
+    try {
+      const rows = getContactsForExport(req.query.ids as string);
+      // Salesforce standard Lead fields
+      const lines = [
+        csvRow(["First Name","Last Name","Title","Company","Email","Phone","Lead Source","Description"]),
+        ...rows.map(c => {
+          const parts = c.name.trim().split(" ");
+          const first = parts.slice(0, -1).join(" ") || parts[0];
+          const last  = parts.length > 1 ? parts[parts.length - 1] : "";
+          const source = (c as any).eventType ? `Event - ${(c as any).eventType}` : "Event";
+          const desc = [(c as any).eventTitle, (c as any).eventDate, c.notes].filter(Boolean).join(" | ");
+          return csvRow([first, last, c.title, c.company, c.email, c.phone, source, desc]);
+        }),
+      ].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="rallypoint-salesforce-leads.csv"`);
+      res.send(lines);
+    } catch { res.status(500).json({ error: "Export failed" }); }
+  });
+
+  // GET /api/contacts/export/hubspot  — HubSpot Contact import format
+  app.get("/api/contacts/export/hubspot", (req, res) => {
+    try {
+      const rows = getContactsForExport(req.query.ids as string);
+      // HubSpot standard contact properties
+      const lines = [
+        csvRow(["First Name","Last Name","Job Title","Company Name","Email","Phone Number","LinkedIn Bio","Notes"]),
+        ...rows.map(c => {
+          const parts = c.name.trim().split(" ");
+          const first = parts.slice(0, -1).join(" ") || parts[0];
+          const last  = parts.length > 1 ? parts[parts.length - 1] : "";
+          const note = [(c as any).eventTitle, (c as any).eventDate, c.notes].filter(Boolean).join(" | ");
+          return csvRow([first, last, c.title, c.company, c.email, c.phone, c.linkedin, note]);
+        }),
+      ].join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="rallypoint-hubspot-contacts.csv"`);
+      res.send(lines);
+    } catch { res.status(500).json({ error: "Export failed" }); }
+  });
+
+  // GET /api/contacts/export/touchpoint  — TouchPoint (tab-separated, paste-friendly)
+  app.get("/api/contacts/export/touchpoint", (req, res) => {
+    try {
+      const rows = getContactsForExport(req.query.ids as string);
+      const headers = ["Name","Title","Company","Email","Phone","LinkedIn","Event","Event Date","Hot Lead","Notes"];
+      const lines = [
+        headers.join("\t"),
+        ...rows.map(c => [
+          c.name, c.title ?? "", c.company ?? "", c.email ?? "",
+          c.phone ?? "", c.linkedin ?? "",
+          (c as any).eventTitle ?? "", (c as any).eventDate ?? "",
+          c.hotLead ? "Yes" : "No", c.notes ?? "",
+        ].join("\t")),
+      ].join("\n");
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="rallypoint-touchpoint.tsv"`);
+      res.send(lines);
+    } catch { res.status(500).json({ error: "Export failed" }); }
+  });
+
 }
