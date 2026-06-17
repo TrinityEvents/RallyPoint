@@ -1,7 +1,10 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState } from "react";
-import { Users, CalendarCheck, UserCheck, AlertCircle, TrendingUp, ChevronRight, CheckCircle2, Clock, ArrowUpRight } from "lucide-react";
+import {
+  Users, CalendarCheck, UserCheck, AlertCircle,
+  TrendingUp, ChevronRight, CheckCircle2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +21,21 @@ interface RepSummary {
   crmExports: number;
 }
 
+interface RepEvent {
+  id: number;
+  title: string;
+  eventDate: string;
+  eventType: string;
+  status: string;
+  contactCount: number;
+}
+
+interface RepDetail {
+  events: RepEvent[];
+  followUps: FollowUp[];
+  exports: { id: number; exportType: string; contactCount: number; exportedAt: string }[];
+}
+
 interface FollowUp {
   id: number;
   contactId: number;
@@ -31,19 +49,20 @@ interface FollowUp {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function activityScore(rep: RepSummary): number {
-  // Benchmark caps (normalize each metric 0–100)
-  const eventScore    = Math.min((rep.eventsAttended / Math.max(rep.eventsPlanned, 1)) * 100, 100);
-  const contactScore  = Math.min((rep.contactsCaptured / 20) * 100, 100); // 20 contacts/period = 100%
-  const followUpScore = rep.followUpTotal > 0
-    ? (rep.followUpDone / rep.followUpTotal) * 100
+  const eventScore   = rep.eventsPlanned > 0
+    ? Math.min((rep.eventsAttended / rep.eventsPlanned) * 100, 100)
     : 0;
-  return Math.round(eventScore * 0.40 + contactScore * 0.35 + followUpScore * 0.25);
+  const contactScore = Math.min((rep.contactsCaptured / 20) * 100, 100);
+  const fuScore      = rep.followUpTotal > 0
+    ? (rep.followUpDone / rep.followUpTotal) * 100
+    : rep.contactsCaptured > 0 ? 0 : 50; // neutral if no contacts yet
+  return Math.round(eventScore * 0.40 + contactScore * 0.35 + fuScore * 0.25);
 }
 
 function scoreBand(score: number): { label: string; color: string; bg: string } {
   if (score >= 75) return { label: "Hot",  color: "#10b981", bg: "rgba(16,185,129,.12)" };
   if (score >= 50) return { label: "Warm", color: "#f59e0b", bg: "rgba(245,158,11,.12)" };
-  return              { label: "Cold", color: "#ef4444", bg: "rgba(239,68,68,.12)" };
+  return              { label: "Cold", color: "#ef4444",  bg: "rgba(239,68,68,.12)" };
 }
 
 function initials(name: string) {
@@ -51,52 +70,208 @@ function initials(name: string) {
 }
 
 function avatarColor(name: string) {
-  const colors = ["#2563FF", "#10b981", "#f59e0b", "#8B5CF6", "#FF5C7A", "#00D4FF"];
-  let hash = 0;
-  for (const c of name) hash = hash * 31 + c.charCodeAt(0);
-  return colors[Math.abs(hash) % colors.length];
+  const palette = ["#2563FF", "#10b981", "#f59e0b", "#8B5CF6", "#FF5C7A", "#00D4FF"];
+  let h = 0;
+  for (const c of name) h = h * 31 + c.charCodeAt(0);
+  return palette[Math.abs(h) % palette.length];
+}
+
+function formatDate(d: string) {
+  return new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function formatDue(dateStr: string): { label: string; overdue: boolean } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr + "T00:00:00");
-  const diff = Math.round((due.getTime() - today.getTime()) / 86400000);
-  if (diff < 0)  return { label: `${Math.abs(diff)}d overdue`, overdue: true };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due   = new Date(dateStr + "T00:00:00");
+  const diff  = Math.round((due.getTime() - today.getTime()) / 86400000);
+  if (diff < 0)   return { label: `${Math.abs(diff)}d overdue`, overdue: true };
   if (diff === 0) return { label: "Due today", overdue: false };
   if (diff === 1) return { label: "Due tomorrow", overdue: false };
   return { label: `Due in ${diff}d`, overdue: false };
 }
 
-// ── Empty state ──────────────────────────────────────────────────────────────
+const TYPE_COLORS: Record<string, string> = {
+  chamber: "#2563FF", networking: "#10b981", "job fair": "#f59e0b",
+  "trade show": "#8B5CF6", "client visit": "#00D4FF", "prospect meeting": "#FF5C7A",
+  other: "#6b7280",
+};
+function typeColor(t: string) { return TYPE_COLORS[t.toLowerCase()] ?? "#6b7280"; }
 
-function EmptyState() {
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+function KpiCard({ icon, label, value, sub, warn }: {
+  icon: React.ReactNode; label: string; value: string | number; sub?: string; warn?: boolean;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-3">
-      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-        <TrendingUp size={24} className="text-primary" />
+    <div className={`flex-1 min-w-[120px] snap-start rounded-xl border ${warn ? "border-red-500/30 bg-red-500/5" : "border-border bg-card"} p-4 flex flex-col gap-1`}>
+      <div className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide ${warn ? "text-red-400" : "text-muted-foreground"}`}>
+        {icon} {label}
       </div>
-      <p className="font-semibold text-foreground">No activity yet</p>
-      <p className="text-sm text-muted-foreground max-w-xs">
-        Attendance and follow-up data will appear here once your team starts logging activity.
-      </p>
+      <span className={`text-2xl font-bold leading-tight ${warn ? "text-red-400" : "text-foreground"}`}>{value}</span>
+      {sub && <span className="text-[10px] text-muted-foreground">{sub}</span>}
     </div>
   );
 }
 
-// ── KPI strip ────────────────────────────────────────────────────────────────
-
-function KpiCard({ icon, label, value, sub }: {
-  icon: React.ReactNode; label: string; value: string | number; sub?: string;
-}) {
+function StatusPill({ status }: { status: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    attended:  { label: "Attended",  color: "#10b981" },
+    upcoming:  { label: "Upcoming",  color: "#2563FF" },
+    cancelled: { label: "Cancelled", color: "#6b7280" },
+    postponed: { label: "Postponed", color: "#f59e0b" },
+  };
+  const s = map[status] ?? map.upcoming;
   return (
-    <div className="flex-1 min-w-[130px] rounded-xl border border-border bg-card p-4 flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium uppercase tracking-wide">
-        {icon}
-        {label}
+    <span
+      className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+      style={{ color: s.color, background: s.color + "22" }}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+// ── Rep detail ───────────────────────────────────────────────────────────────
+
+function RepDetailView({ rep, onBack, onMarkDone }: {
+  rep: RepSummary;
+  onBack: () => void;
+  onMarkDone: (id: number) => void;
+}) {
+  const { data: detail, isLoading } = useQuery<RepDetail>({
+    queryKey: ["/api/accountability/rep", rep.userName],
+    queryFn: () => apiRequest("GET", `/api/accountability/rep/${encodeURIComponent(rep.userName)}`).then(r => r.json()),
+  });
+
+  const score = activityScore(rep);
+  const band  = scoreBand(score);
+  const followPct = rep.followUpTotal > 0
+    ? Math.round((rep.followUpDone / rep.followUpTotal) * 100) : 0;
+
+  return (
+    <div className="space-y-5">
+      {/* Back */}
+      <button
+        data-testid="btn-back-team"
+        onClick={onBack}
+        className="text-sm text-primary font-medium flex items-center gap-1"
+      >
+        ← Team Activity
+      </button>
+
+      {/* Hero */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+            style={{ background: avatarColor(rep.userName) }}
+          >
+            {initials(rep.userName)}
+          </div>
+          <div>
+            <div className="font-bold text-foreground">{rep.userName}</div>
+            <div
+              className="text-xs font-semibold rounded-full px-2 py-0.5 inline-block mt-0.5"
+              style={{ color: band.color, background: band.bg }}
+            >
+              Score {score} · {band.label}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: "Events Attended",   val: `${rep.eventsAttended} / ${rep.eventsPlanned}` },
+            { label: "Contacts Captured", val: rep.contactsCaptured },
+            { label: "Follow-ups",        val: `${rep.followUpDone} / ${rep.followUpTotal || "—"}` },
+            { label: "CRM Exports",       val: rep.crmExports || "—" },
+          ].map(({ label, val }) => (
+            <div key={label} className="rounded-lg bg-muted/40 p-3">
+              <div className="text-[10px] text-muted-foreground mb-0.5 uppercase tracking-wide">{label}</div>
+              <div className="font-bold text-foreground text-sm">{val}</div>
+            </div>
+          ))}
+        </div>
       </div>
-      <span className="text-2xl font-bold text-foreground leading-tight">{value}</span>
-      {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+
+      {/* Events this rep was part of */}
+      <div>
+        <h3 className="font-semibold text-sm text-foreground mb-2">Events</h3>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
+        ) : !detail?.events?.length ? (
+          <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground text-center">
+            No events logged yet
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {detail.events.map(ev => (
+              <div
+                key={ev.id}
+                className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5"
+              >
+                <div
+                  className="w-1.5 h-8 rounded-full shrink-0"
+                  style={{ background: typeColor(ev.eventType) }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-foreground truncate">{ev.title}</div>
+                  <div className="text-[10px] text-muted-foreground">{formatDate(ev.eventDate)} · {ev.eventType}</div>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <StatusPill status={ev.status} />
+                  {ev.contactCount > 0 && (
+                    <span className="text-[10px] text-muted-foreground">{ev.contactCount} contacts</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Follow-up queue */}
+      {detail?.followUps && detail.followUps.filter(f => f.status !== "done").length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-sm text-foreground">Open Follow-ups</h3>
+            <span className="text-xs text-muted-foreground">
+              {detail.followUps.filter(f => f.status !== "done").length} pending
+            </span>
+          </div>
+          <div className="space-y-2">
+            {detail.followUps
+              .filter(f => f.status !== "done")
+              .map(fu => {
+                const due = formatDue(fu.dueDate);
+                return (
+                  <div
+                    key={fu.id}
+                    data-testid={`followup-${fu.id}`}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5"
+                  >
+                    <button
+                      data-testid={`btn-done-${fu.id}`}
+                      onClick={() => onMarkDone(fu.id)}
+                      className="w-5 h-5 rounded-full border-2 border-muted-foreground/30 hover:border-primary transition-colors shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      {fu.note
+                        ? <div className="text-sm text-foreground truncate">{fu.note}</div>
+                        : <div className="text-sm text-muted-foreground">Contact #{fu.contactId}</div>
+                      }
+                    </div>
+                    <span className={`text-xs font-medium shrink-0 ${due.overdue ? "text-red-500" : "text-muted-foreground"}`}>
+                      {due.label}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -107,8 +282,9 @@ function RepCard({ rep, onSelect }: { rep: RepSummary; onSelect: () => void }) {
   const score = activityScore(rep);
   const band  = scoreBand(score);
   const followPct = rep.followUpTotal > 0
-    ? Math.round((rep.followUpDone / rep.followUpTotal) * 100)
-    : 0;
+    ? Math.round((rep.followUpDone / rep.followUpTotal) * 100) : 0;
+  const attendPct = rep.eventsPlanned > 0
+    ? Math.round((rep.eventsAttended / rep.eventsPlanned) * 100) : 0;
 
   return (
     <button
@@ -116,7 +292,7 @@ function RepCard({ rep, onSelect }: { rep: RepSummary; onSelect: () => void }) {
       onClick={onSelect}
       className="w-full text-left rounded-xl border border-border bg-card p-4 hover:border-primary/40 transition-colors active:scale-[.99]"
     >
-      {/* Header row */}
+      {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
@@ -133,148 +309,49 @@ function RepCard({ rep, onSelect }: { rep: RepSummary; onSelect: () => void }) {
             {score} · {band.label}
           </div>
         </div>
-        <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+        <ChevronRight size={15} className="text-muted-foreground shrink-0" />
       </div>
 
-      {/* Stat row */}
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="text-center">
-          <div className="text-lg font-bold text-foreground">{rep.eventsAttended}</div>
+          <div className="text-base font-bold text-foreground">{rep.eventsAttended}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Events</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-foreground">{rep.contactsCaptured}</div>
+          <div className="text-base font-bold text-foreground">{rep.contactsCaptured}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Contacts</div>
         </div>
         <div className="text-center">
-          <div className="text-lg font-bold text-foreground">{followPct}%</div>
+          <div className="text-base font-bold text-foreground">{followPct > 0 ? `${followPct}%` : "—"}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Follow-up</div>
         </div>
       </div>
 
-      {/* Follow-up progress bar */}
+      {/* Attendance bar */}
       <div className="space-y-1">
         <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>Follow-up rate</span>
-          <span>{rep.followUpDone}/{rep.followUpTotal}</span>
+          <span>Event attendance</span>
+          <span>{rep.eventsAttended}/{rep.eventsPlanned}</span>
         </div>
-        <Progress
-          value={followPct}
-          className="h-1.5"
-        />
+        <Progress value={attendPct} className="h-1.5" />
       </div>
     </button>
   );
 }
 
-// ── Rep detail drawer (mobile sheet pattern) ─────────────────────────────────
+// ── Empty state ──────────────────────────────────────────────────────────────
 
-function RepDetail({ rep, followUps, onBack, onMarkDone }: {
-  rep: RepSummary;
-  followUps: FollowUp[];
-  onBack: () => void;
-  onMarkDone: (id: number) => void;
-}) {
-  const myFollowUps = followUps.filter(f => f.assignedTo === rep.userName);
-  const pending = myFollowUps.filter(f => f.status !== "done");
-  const score = activityScore(rep);
-  const band  = scoreBand(score);
-
+function EmptyState() {
   return (
-    <div className="space-y-5">
-      {/* Back + header */}
-      <div className="flex items-center gap-3">
-        <button
-          data-testid="btn-back-team"
-          onClick={onBack}
-          className="text-sm text-primary font-medium flex items-center gap-1"
-        >
-          ← Team
-        </button>
+    <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-3">
+      <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+        <TrendingUp size={24} className="text-primary" />
       </div>
-
-      {/* Rep hero card */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div
-            className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold"
-            style={{ background: avatarColor(rep.userName) }}
-          >
-            {initials(rep.userName)}
-          </div>
-          <div>
-            <div className="font-bold text-foreground">{rep.userName}</div>
-            <div
-              className="text-xs font-semibold rounded-full px-2 py-0.5 inline-block mt-0.5"
-              style={{ color: band.color, background: band.bg }}
-            >
-              Activity Score: {score} — {band.label}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "Events Attended",   val: `${rep.eventsAttended} / ${rep.eventsPlanned}` },
-            { label: "Contacts Captured", val: rep.contactsCaptured },
-            { label: "Follow-ups Done",   val: `${rep.followUpDone} / ${rep.followUpTotal}` },
-            { label: "CRM Exports",       val: rep.crmExports },
-          ].map(({ label, val }) => (
-            <div key={label} className="rounded-lg bg-muted/40 p-3">
-              <div className="text-xs text-muted-foreground mb-0.5">{label}</div>
-              <div className="font-bold text-foreground">{val}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Follow-up queue */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold text-sm text-foreground">Open Follow-ups</h3>
-          <span className="text-xs text-muted-foreground">{pending.length} pending</span>
-        </div>
-
-        {pending.length === 0 ? (
-          <div className="rounded-xl border border-border bg-card p-4 text-center text-sm text-muted-foreground">
-            All caught up ✓
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {pending.map(fu => {
-              const due = formatDue(fu.dueDate);
-              return (
-                <div
-                  key={fu.id}
-                  data-testid={`followup-${fu.id}`}
-                  className="flex items-start gap-3 rounded-xl border border-border bg-card p-3"
-                >
-                  <button
-                    data-testid={`btn-done-${fu.id}`}
-                    onClick={() => onMarkDone(fu.id)}
-                    className="mt-0.5 w-5 h-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary flex items-center justify-center shrink-0 transition-colors"
-                  >
-                    <CheckCircle2 size={12} className="text-transparent hover:text-primary" />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-foreground truncate">
-                      Contact #{fu.contactId}
-                    </div>
-                    {fu.note && (
-                      <div className="text-xs text-muted-foreground truncate">{fu.note}</div>
-                    )}
-                  </div>
-                  <span
-                    className={`text-xs font-medium shrink-0 ${due.overdue ? "text-red-500" : "text-muted-foreground"}`}
-                  >
-                    {due.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <p className="font-semibold text-foreground">No activity yet</p>
+      <p className="text-sm text-muted-foreground max-w-xs">
+        Add events and assign them to reps — activity scores will calculate automatically.
+      </p>
     </div>
   );
 }
@@ -286,10 +363,6 @@ export default function AccountabilityPage() {
 
   const { data: team = [], isLoading } = useQuery<RepSummary[]>({
     queryKey: ["/api/accountability/team"],
-  });
-
-  const { data: allFollowUps = [] } = useQuery<FollowUp[]>({
-    queryKey: ["/api/follow-ups"],
   });
 
   const markDone = useMutation({
@@ -304,117 +377,83 @@ export default function AccountabilityPage() {
     },
   });
 
-  // ── Derived totals ────────────────────────────────────────────────────────
+  // Totals
   const totals = team.reduce(
     (acc, r) => ({
-      events:    acc.events    + r.eventsAttended,
-      contacts:  acc.contacts  + r.contactsCaptured,
-      fuTotal:   acc.fuTotal   + r.followUpTotal,
-      fuDone:    acc.fuDone    + r.followUpDone,
-      exports:   acc.exports   + r.crmExports,
+      events:   acc.events   + r.eventsAttended,
+      contacts: acc.contacts + r.contactsCaptured,
+      fuTotal:  acc.fuTotal  + r.followUpTotal,
+      fuDone:   acc.fuDone   + r.followUpDone,
     }),
-    { events: 0, contacts: 0, fuTotal: 0, fuDone: 0, exports: 0 }
+    { events: 0, contacts: 0, fuTotal: 0, fuDone: 0 }
   );
 
   const teamFollowPct = totals.fuTotal > 0
-    ? Math.round((totals.fuDone / totals.fuTotal) * 100)
-    : 0;
+    ? Math.round((totals.fuDone / totals.fuTotal) * 100) : 0;
 
-  const overdueCount = allFollowUps.filter(f => {
-    if (f.status === "done") return false;
-    const today = new Date().toISOString().split("T")[0];
-    return f.dueDate < today;
-  }).length;
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
+  // Loading
   if (isLoading) {
     return (
       <div className="space-y-4">
+        <Skeleton className="h-7 w-40 rounded" />
         <div className="flex gap-3 overflow-x-auto pb-1">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-20 flex-1 min-w-[130px] rounded-xl" />
-          ))}
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-20 flex-1 min-w-[120px] rounded-xl" />)}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32 rounded-xl" />
-          ))}
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
         </div>
       </div>
     );
   }
 
-  // Rep detail view
+  // Rep detail drill-in
   if (selectedRep) {
     return (
-      <RepDetail
+      <RepDetailView
         rep={selectedRep}
-        followUps={allFollowUps}
         onBack={() => setSelectedRep(null)}
         onMarkDone={(id) => markDone.mutate(id)}
       />
     );
   }
 
-  // Empty state — no reps yet
-  if (team.length === 0) {
-    return <EmptyState />;
-  }
+  if (team.length === 0) return <EmptyState />;
 
   return (
     <div className="space-y-5">
-      {/* Page header */}
+      {/* Header */}
       <div>
         <h1 className="text-xl font-bold text-foreground">Team Activity</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Activity tracking — not outcomes
-        </p>
+        <p className="text-sm text-muted-foreground mt-0.5">Activity tracking — not outcomes</p>
       </div>
 
-      {/* KPI strip — horizontal scroll on mobile */}
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
+      {/* KPI strip */}
+      <div className="flex gap-3 overflow-x-auto pb-1 snap-x -mx-1 px-1">
         <KpiCard
           icon={<CalendarCheck size={12} />}
           label="Events"
           value={totals.events}
-          sub={`${team.length} reps`}
+          sub={`${team.length} reps tracked`}
         />
         <KpiCard
           icon={<Users size={12} />}
           label="Contacts"
           value={totals.contacts}
         />
-        <KpiCard
-          icon={<UserCheck size={12} />}
-          label="Follow-up"
-          value={`${teamFollowPct}%`}
-          sub={`${totals.fuDone}/${totals.fuTotal}`}
-        />
-        {overdueCount > 0 && (
+        {totals.fuTotal > 0 && (
           <KpiCard
-            icon={<AlertCircle size={12} />}
-            label="Overdue"
-            value={overdueCount}
-            sub="need attention"
+            icon={<UserCheck size={12} />}
+            label="Follow-up"
+            value={`${teamFollowPct}%`}
+            sub={`${totals.fuDone}/${totals.fuTotal}`}
           />
         )}
       </div>
 
-      {/* Overdue alert bar */}
-      {overdueCount > 0 && (
-        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2.5">
-          <AlertCircle size={14} className="text-red-500 shrink-0" />
-          <span className="text-sm text-red-500 font-medium">
-            {overdueCount} overdue follow-up{overdueCount > 1 ? "s" : ""} need attention
-          </span>
-        </div>
-      )}
-
-      {/* Rep grid — 1 col mobile, 2 col tablet+ */}
+      {/* Rep grid */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-sm text-foreground">Rep Performance</h2>
+          <h2 className="font-semibold text-sm text-foreground">Reps</h2>
           <span className="text-xs text-muted-foreground">Tap to drill in</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -430,12 +469,9 @@ export default function AccountabilityPage() {
         </div>
       </div>
 
-      {/* Score key */}
-      <div className="rounded-xl border border-border bg-card/50 p-4">
-        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-          Activity Score Key
-        </div>
-        <div className="grid grid-cols-3 gap-2">
+      {/* Score key — compact */}
+      <div className="rounded-xl border border-border bg-card/40 px-4 py-3">
+        <div className="flex items-center justify-around gap-4">
           {[
             { band: "Hot",  range: "75–100", color: "#10b981" },
             { band: "Warm", range: "50–74",  color: "#f59e0b" },
@@ -448,7 +484,7 @@ export default function AccountabilityPage() {
           ))}
         </div>
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Based on attendance, contacts captured, and follow-up rate — not revenue
+          Attendance · contacts · follow-ups — not revenue
         </p>
       </div>
     </div>

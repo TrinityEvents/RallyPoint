@@ -272,7 +272,9 @@ export const accountabilityStorage = {
     return db.select().from(attendanceLog).where(eq(attendanceLog.eventId, eventId)).all();
   },
 
-  // --- Team summary: per-rep aggregated stats ---
+  // --- Team summary: derives stats from events + contacts tables directly ---
+  // "attending" field: "Ryan" | "Connie" | "Both" | "Tentative"
+  // We treat "Both" as credit for both reps. Tentative = planned but not attended.
   getTeamSummary(): Array<{
     userName: string;
     eventsPlanned: number;
@@ -282,57 +284,114 @@ export const accountabilityStorage = {
     followUpDone: number;
     crmExports: number;
   }> {
-    const attendance = sqlite.prepare(`
-      SELECT
-        user_name           AS userName,
-        SUM(planned)        AS eventsPlanned,
-        SUM(attended)       AS eventsAttended,
-        SUM(contacts_captured) AS contactsCaptured
-      FROM attendance_log
-      GROUP BY user_name
-    `).all() as { userName: string; eventsPlanned: number; eventsAttended: number; contactsCaptured: number }[];
+    const today = new Date().toISOString().split("T")[0];
 
-    const followUpsByRep = sqlite.prepare(`
-      SELECT
-        assigned_to           AS userName,
-        COUNT(*)              AS total,
-        SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done
-      FROM follow_ups
-      GROUP BY assigned_to
-    `).all() as { userName: string; total: number; done: number }[];
+    // Get all reps from distinct attending/added_by values
+    const repRows = sqlite.prepare(`
+      SELECT DISTINCT added_by AS name FROM events
+      WHERE added_by NOT IN ('', 'Tentative')
+      UNION
+      SELECT DISTINCT
+        CASE WHEN attending IN ('Ryan','Connie') THEN attending ELSE NULL END
+      FROM events
+      WHERE attending IN ('Ryan','Connie')
+    `).all() as { name: string | null }[];
 
-    const exportsByRep = sqlite.prepare(`
-      SELECT exported_by AS userName, COUNT(*) AS cnt
-      FROM crm_exports GROUP BY exported_by
-    `).all() as { userName: string; cnt: number }[];
+    const reps = [...new Set(repRows.map(r => r.name).filter(Boolean))] as string[];
 
-    const fuMap = Object.fromEntries(followUpsByRep.map(r => [r.userName, r]));
-    const exMap = Object.fromEntries(exportsByRep.map(r => [r.userName, r]));
+    // If no reps found at all, return empty
+    if (reps.length === 0) return [];
 
-    return attendance.map(row => ({
-      userName: row.userName,
-      eventsPlanned: row.eventsPlanned || 0,
-      eventsAttended: row.eventsAttended || 0,
-      contactsCaptured: row.contactsCaptured || 0,
-      followUpTotal: fuMap[row.userName]?.total || 0,
-      followUpDone: fuMap[row.userName]?.done || 0,
-      crmExports: exMap[row.userName]?.cnt || 0,
-    }));
+    return reps.map(rep => {
+      // Events planned: this rep is listed in attending (Ryan, Connie, Both)
+      const planned = sqlite.prepare(`
+        SELECT COUNT(*) AS cnt FROM events
+        WHERE attending = ? OR attending = 'Both'
+      `).get(rep) as { cnt: number };
+
+      // Events attended: past events where this rep was attending
+      const attended = sqlite.prepare(`
+        SELECT COUNT(*) AS cnt FROM events
+        WHERE event_date < ?
+        AND (attending = ? OR attending = 'Both')
+        AND status NOT IN ('cancelled','postponed')
+      `).get(today, rep) as { cnt: number };
+
+      // Contacts captured: contacts added at events where rep was attending
+      // Use added_by on the event to attribute contacts to that rep
+      const contactsCaptured = sqlite.prepare(`
+        SELECT COUNT(*) AS cnt FROM contacts c
+        JOIN events e ON c.event_id = e.id
+        WHERE e.added_by = ? OR e.attending = ? OR e.attending = 'Both'
+      `).get(rep, rep) as { cnt: number };
+
+      // Follow-ups: contacts with notes = treated as "has a follow-up"
+      // follow_ups table entries assigned to this rep
+      const fuRows = sqlite.prepare(`
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) AS done
+        FROM follow_ups WHERE assigned_to = ?
+      `).get(rep) as { total: number; done: number } | undefined;
+
+      // Also count contacts that have notes (organic follow-up proxy)
+      const contactsWithNotes = sqlite.prepare(`
+        SELECT COUNT(*) AS cnt FROM contacts c
+        JOIN events e ON c.event_id = e.id
+        WHERE (e.added_by = ? OR e.attending = ? OR e.attending = 'Both')
+        AND c.notes IS NOT NULL AND c.notes != ''
+      `).get(rep, rep) as { cnt: number };
+
+      const fuTotal = (fuRows?.total || 0) + (contactsWithNotes?.cnt || 0);
+      const fuDone  = fuRows?.done || 0;
+
+      // CRM exports logged for this rep
+      const exps = sqlite.prepare(`
+        SELECT COUNT(*) AS cnt FROM crm_exports WHERE exported_by = ?
+      `).get(rep) as { cnt: number };
+
+      return {
+        userName: rep,
+        eventsPlanned: planned?.cnt || 0,
+        eventsAttended: attended?.cnt || 0,
+        contactsCaptured: contactsCaptured?.cnt || 0,
+        followUpTotal: fuTotal,
+        followUpDone: fuDone,
+        crmExports: exps?.cnt || 0,
+      };
+    });
   },
 
-  // --- Rep detail ---
+  // --- Rep detail: pulls real events + contacts for this rep ---
   getRepDetail(userName: string): {
-    attendance: AttendanceRecord[];
+    events: Array<{ id: number; title: string; eventDate: string; eventType: string; status: string; contactCount: number }>;
     followUps: FollowUp[];
     exports: CrmExport[];
   } {
-    const attendance = db.select().from(attendanceLog)
-      .where(eq(attendanceLog.userName, userName)).all();
+    const today = new Date().toISOString().split("T")[0];
+
+    // Events this rep attended or was planned for
+    const repEvents = sqlite.prepare(`
+      SELECT e.id, e.title, e.event_date AS eventDate, e.event_type AS eventType,
+             e.status,
+             (SELECT COUNT(*) FROM contacts c WHERE c.event_id = e.id) AS contactCount
+      FROM events e
+      WHERE e.attending = ? OR e.attending = 'Both'
+      ORDER BY e.event_date DESC
+      LIMIT 20
+    `).all(userName) as Array<{ id: number; title: string; eventDate: string; eventType: string; status: string; contactCount: number }>;
+
+    // Add "attended" status derived from date if status = upcoming but date is past
+    const enriched = repEvents.map(ev => ({
+      ...ev,
+      status: ev.status === 'upcoming' && ev.eventDate < today ? 'attended' : ev.status,
+    }));
+
     const fus = db.select().from(followUps)
       .where(eq(followUps.assignedTo, userName)).all();
     const exps = db.select().from(crmExports)
       .where(eq(crmExports.exportedBy, userName)).all();
-    return { attendance, followUps: fus, exports: exps };
+
+    return { events: enriched, followUps: fus, exports: exps };
   },
 
   // --- Follow-ups ---

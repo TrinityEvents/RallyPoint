@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage } from "./storage";
+import { storage, accountabilityStorage } from "./storage";
 import { insertEventSchema, insertContactSchema } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -772,7 +772,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // GET /api/accountability/team — team-wide summary per rep
   app.get("/api/accountability/team", (_req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const summary = accountabilityStorage.getTeamSummary();
       res.json(summary);
     } catch (err) {
@@ -783,7 +782,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // GET /api/accountability/rep/:name — individual rep detail
   app.get("/api/accountability/rep/:name", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const data = accountabilityStorage.getRepDetail(req.params.name);
       res.json(data);
     } catch (err) {
@@ -794,7 +792,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // GET /api/follow-ups — all or filtered by ?assignedTo=
   app.get("/api/follow-ups", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const assignedTo = req.query.assignedTo as string | undefined;
       const items = accountabilityStorage.getFollowUps(assignedTo);
       res.json(items);
@@ -806,7 +803,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // POST /api/follow-ups
   app.post("/api/follow-ups", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const item = accountabilityStorage.createFollowUp(req.body);
       res.status(201).json(item);
     } catch (err) {
@@ -817,7 +813,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // PATCH /api/follow-ups/:id
   app.patch("/api/follow-ups/:id", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const id = parseInt(req.params.id);
       const updated = accountabilityStorage.updateFollowUp(id, req.body);
       if (!updated) return res.status(404).json({ error: "Follow-up not found" });
@@ -830,7 +825,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // POST /api/attendance
   app.post("/api/attendance", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const record = accountabilityStorage.logAttendance(req.body);
       res.status(201).json(record);
     } catch (err) {
@@ -841,7 +835,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // PATCH /api/attendance/:id
   app.patch("/api/attendance/:id", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const id = parseInt(req.params.id);
       const updated = accountabilityStorage.updateAttendance(id, req.body);
       if (!updated) return res.status(404).json({ error: "Attendance record not found" });
@@ -854,7 +847,6 @@ export function registerRoutes(httpServer: Server, app: Express) {
   // POST /api/crm-exports — log an export event
   app.post("/api/crm-exports", (req, res) => {
     try {
-      const { accountabilityStorage } = require("./storage");
       const record = accountabilityStorage.logCrmExport({
         exportedBy: req.body.exportedBy,
         exportType: req.body.exportType || "csv",
