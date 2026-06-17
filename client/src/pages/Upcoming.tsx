@@ -582,12 +582,13 @@ function EventCard({ event }: { event: Event }) {
       <div
         data-testid={`event-card-${event.id}`}
         className={cn(
-          "rounded-xl border shadow-sm hover:shadow-lg transition-all p-4",
+          "rounded-xl border shadow-sm hover:shadow-lg transition-all p-4 border-l-4",
           "bg-white dark:bg-slate-800/90",
           "border-slate-200 dark:border-slate-700",
           event.status === "cancelled" && "opacity-60",
           event.status === "attended" && "border-green-300 dark:border-green-800 bg-green-50/60 dark:bg-green-900/10"
         )}
+        style={{ borderLeftColor: EVENT_TYPE_COLORS[event.eventType] ?? "#64748B" }}
       >
         {/* Top row: type badge + days chip + attending */}
         <div className="flex items-start justify-between gap-2 mb-2">

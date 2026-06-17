@@ -2,13 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Load Inter from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+/* Load Space Grotesk from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
     /* ── RallyPoint Light Mode ── */
-    --background:        220 25% 97%;
+    --background:        220 18% 94%;
     --foreground:        222 47% 11%;
     --card:              0 0% 100%;
     --card-foreground:   222 47% 11%;
@@ -37,7 +37,7 @@
     --border:            220 15% 88%;
     --input:             220 15% 88%;
     --ring:              224 100% 57%;
-    --radius:            0.5rem;
+    --radius:            0.25rem;
 
     /* RallyPoint brand colors (used as CSS vars in components) */
     --rp-navy:    #0B132B;
@@ -84,7 +84,7 @@
   * { @apply border-border; }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 }
@@ -93,6 +93,33 @@
 .rallypoint-header {
   background: #0B132B;
   border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ── KPI / Stat cards — navy treatment ── */
+.kpi-card {
+  background: #0B132B;
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.kpi-card .kpi-value {
+  color: #00D4FF;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kpi-card .kpi-label {
+  color: rgba(255,255,255,0.55);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Nav active state: cyan underline, no white box ── */
+.nav-tab-active {
+  color: #fff !important;
+  border-bottom: 2px solid #00D4FF;
+  background: transparent !important;
 }
 
 /* ── Event type badge colors (RallyPoint palette) ── */
