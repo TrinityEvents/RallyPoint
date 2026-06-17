@@ -1,7 +1,7 @@
 /**
  * Global Contacts page — all contacts across every event.
  * Features: search, filter by event type / hot lead, bulk select,
- * bulk CSV export, bulk TouchPoint-ready copy, single-contact email.
+ * bulk CSV export, vCard download, clipboard copy — CRM-agnostic.
  */
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -42,27 +42,25 @@ const TYPE_COLORS: Record<string, string> = {
   "Other":            "#64748B",
 };
 
-// ── CRM export helpers ────────────────────────────────────────────────────────
+// ── Export helpers ────────────────────────────────────────────────────────────
 
-type ExportFormat = "csv" | "salesforce" | "hubspot" | "touchpoint";
+type ExportFormat = "csv" | "vcf";
 
 function exportViaServer(format: ExportFormat, ids?: number[]) {
   const base = `/api/contacts/export/${format}`;
   const url  = ids && ids.length > 0 ? `${base}?ids=${ids.join(",")}` : base;
-  // Trigger download via hidden anchor
   const a = document.createElement("a");
   a.href = url;
   a.click();
 }
 
-// Fallback: copy tab-separated to clipboard for TouchPoint paste
-function copyForCRM(rows: GlobalContact[]) {
-  const headers = ["Name","Title","Company","Email","Phone","LinkedIn","Event","Event Date"];
-  const lines = rows.map(c => [
-    c.name, c.title ?? "", c.company ?? "", c.email ?? "",
-    c.phone ?? "", c.linkedin ?? "", c.eventTitle ?? "", c.eventDate ?? "",
-  ].join("\t"));
-  navigator.clipboard.writeText([headers.join("\t"), ...lines].join("\n"));
+async function copyToClipboard(ids?: number[]): Promise<void> {
+  const url = ids && ids.length > 0
+    ? `/api/contacts/export/clipboard?ids=${ids.join(",")}`
+    : "/api/contacts/export/clipboard";
+  const res  = await fetch(url);
+  const text = await res.text();
+  await navigator.clipboard.writeText(text);
 }
 
 // ── Contact row ───────────────────────────────────────────────────────────────
@@ -234,9 +232,9 @@ export default function ContactsPage() {
     });
   }
 
-  function handleCopyForCRM() {
-    const rows = selectedContacts.length > 0 ? selectedContacts : filtered;
-    copyForCRM(rows);
+  async function handleCopyToClipboard() {
+    const ids = selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined;
+    await copyToClipboard(ids);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -244,6 +242,9 @@ export default function ContactsPage() {
   function handleExportCSV() {
     exportViaServer("csv", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined);
   }
+
+  // kept for compatibility — not used in UI anymore
+  function handleCopyForCRM() { handleCopyToClipboard(); }
 
   const exportCount = selectedContacts.length > 0 ? selectedContacts.length : filtered.length;
 
@@ -279,37 +280,30 @@ export default function ContactsPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-              {selectedContacts.length > 0 ? `${exportCount} selected contacts` : "All contacts"}
+              {selectedContacts.length > 0 ? `${exportCount} selected` : `All ${contacts.length} contacts`}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => exportViaServer("csv", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
               data-testid="export-csv"
             >
-              <Download size={13} className="mr-2" />
-              Generic CSV
+              <Download size={13} className="mr-2 text-muted-foreground" />
+              Download CSV
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => exportViaServer("salesforce", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
-              data-testid="export-salesforce"
+              onClick={() => exportViaServer("vcf", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
+              data-testid="export-vcf"
             >
-              <Download size={13} className="mr-2" />
-              Salesforce Leads
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => exportViaServer("hubspot", selectedContacts.length > 0 ? selectedContacts.map(c => c.id) : undefined)}
-              data-testid="export-hubspot"
-            >
-              <Download size={13} className="mr-2" />
-              HubSpot Contacts
+              <Download size={13} className="mr-2 text-muted-foreground" />
+              Download vCard (.vcf)
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={handleCopyForCRM}
-              data-testid="export-touchpoint"
+              onClick={handleCopyToClipboard}
+              data-testid="export-clipboard"
             >
-              <Copy size={13} className="mr-2" />
-              {copied ? "Copied!" : "Copy for TouchPoint"}
+              <Copy size={13} className="mr-2 text-muted-foreground" />
+              {copied ? "Copied!" : "Copy to Clipboard"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -450,11 +444,10 @@ export default function ContactsPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => exportViaServer("csv", selectedContacts.map(c => c.id))}>Generic CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportViaServer("salesforce", selectedContacts.map(c => c.id))}>Salesforce Leads</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => exportViaServer("hubspot", selectedContacts.map(c => c.id))}>HubSpot Contacts</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportViaServer("csv", selectedContacts.map(c => c.id))}>Download CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportViaServer("vcf", selectedContacts.map(c => c.id))}>Download vCard (.vcf)</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleCopyForCRM}>{copied ? "Copied!" : "Copy for TouchPoint"}</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopyToClipboard}>{copied ? "Copied!" : "Copy to Clipboard"}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelected(new Set())}>
