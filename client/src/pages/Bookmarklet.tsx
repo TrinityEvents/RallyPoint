@@ -44,11 +44,27 @@ export default function BookmarkletPage() {
           data-testid="bookmarklet-link"
           className="inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-md cursor-grab active:cursor-grabbing select-none hover:bg-primary/90 transition-colors"
         >
-          <BookmarkPlus size={16} />
-          + Add to Sales Mission
+          {/* RallyPoint starburst mark — shows as branded icon in bookmarks bar */}
+          <svg width="16" height="16" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="#0B132B"/>
+            <circle cx="16" cy="16" r="2.5" fill="#2563FF"/>
+            <circle cx="16" cy="7" r="2" fill="#00D4FF"/>
+            <line x1="16" y1="9" x2="16" y2="13.5" stroke="#2563FF" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="23.5" cy="10.5" r="2" fill="#FF9F1C"/>
+            <line x1="21.9" y1="11.9" x2="18" y2="14.8" stroke="#FF9F1C" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="23.5" cy="21.5" r="2" fill="#FF5C7A"/>
+            <line x1="21.9" y1="20.1" x2="18" y2="17.2" stroke="#FF5C7A" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="16" cy="25" r="2" fill="#8B5CF6"/>
+            <line x1="16" y1="23" x2="16" y2="18.5" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="8.5" cy="21.5" r="2" fill="#FFD60A"/>
+            <line x1="10.1" y1="20.1" x2="14" y2="17.2" stroke="#FFD60A" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="8.5" cy="10.5" r="2" fill="#00D4FF"/>
+            <line x1="10.1" y1="11.9" x2="14" y2="14.8" stroke="#00D4FF" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          + Add to RallyPoint
         </a>
         <p className="text-xs text-muted-foreground">
-          Drag the green button into your browser's bookmarks bar — do this once, use forever
+          Drag the button into your browser's bookmarks bar — do this once, use forever
         </p>
       </div>
 
@@ -60,7 +76,7 @@ export default function BookmarkletPage() {
             {
               icon: <BookmarkPlus size={18} className="text-primary" />,
               step: "1. Install once",
-              detail: "Drag the green button above into your browser's bookmarks bar.",
+              detail: "Drag the button above into your browser's bookmarks bar.",
             },
             {
               icon: <MousePointerClick size={18} className="text-primary" />,
@@ -108,7 +124,7 @@ export default function BookmarkletPage() {
           <li>Tap <strong>Copy Code</strong> below</li>
           <li>Bookmark any page (Share → Add Bookmark)</li>
           <li>Edit the bookmark, delete the URL, paste the copied code</li>
-          <li>Rename it <strong>+ Sales Mission</strong> and save</li>
+          <li>Rename it <strong>+ Add to RallyPoint</strong> and save</li>
         </ol>
         <Button
           variant="outline"

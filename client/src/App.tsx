@@ -37,7 +37,7 @@ function RallyPointLogo() {
   return (
     <div className="flex items-center gap-2.5">
       {/* Starburst mark */}
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-label="RallyPoint logo mark">
+      <svg width="42" height="42" viewBox="0 0 32 32" fill="none" aria-label="RallyPoint logo mark">
         <rect width="32" height="32" rx="8" fill="#0B132B"/>
         {/* 6 nodes connected to center — people network / rally point */}
         {/* Center dot */}
@@ -63,10 +63,10 @@ function RallyPointLogo() {
       </svg>
       {/* Wordmark */}
       <div className="flex items-baseline gap-0">
-        <span className="text-white font-bold text-[17px] tracking-tight leading-none">Rally</span>
-        <span className="font-bold text-[17px] tracking-tight leading-none" style={{color:"#00D4FF"}}>Point</span>
+        <span className="text-white font-bold text-[22px] tracking-tight leading-none">Rally</span>
+        <span className="font-bold text-[22px] tracking-tight leading-none" style={{color:"#00D4FF"}}>Point</span>
         {/* spark accent */}
-        <svg width="8" height="8" viewBox="0 0 8 8" className="ml-0.5 mb-1" style={{color:"#FFD60A"}}>
+        <svg width="10" height="10" viewBox="0 0 8 8" className="ml-0.5 mb-1.5" style={{color:"#FFD60A"}}>
           <path d="M4 0 L4.8 3.2 L8 4 L4.8 4.8 L4 8 L3.2 4.8 L0 4 L3.2 3.2 Z" fill="currentColor"/>
         </svg>
       </div>
