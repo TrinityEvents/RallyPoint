@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
-import { Calendar, Link2, User, MapPin, FileText, Clock, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { Calendar, Link2, User, MapPin, FileText, Clock, Sparkles, Loader2, CheckCircle2, Repeat2 } from "lucide-react";
 
 const formSchema = insertEventSchema.extend({
   title: z.string().min(2, "Title must be at least 2 characters"),
@@ -110,6 +110,11 @@ export default function AddEventPage() {
   const [textSnippet, setTextSnippet] = useState("");
   const [textParseStatus, setTextParseStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceRule, setRecurrenceRule] = useState<"weekly" | "biweekly" | "monthly">("weekly");
+  const [recurrenceEnd, setRecurrenceEnd] = useState("");
+
   // Auto-parse when prefillUrl is present on mount
   useEffect(() => {
     if (prefillUrl) {
@@ -196,7 +201,12 @@ export default function AddEventPage() {
   });
 
   const onSubmit = (data: FormValues) => {
-    createMutation.mutate(data);
+    const payload: Record<string, unknown> = { ...data };
+    if (isRecurring && recurrenceRule && recurrenceEnd) {
+      payload.recurrenceRule = recurrenceRule;
+      payload.recurrenceEnd = recurrenceEnd;
+    }
+    createMutation.mutate(payload as FormValues);
   };
 
   const eventType = form.watch("eventType");
@@ -387,6 +397,79 @@ export default function AddEventPage() {
                 </FormItem>
               )}
             />
+          </div>
+
+          {/* Repeat / Recurrence */}
+          <div className={cn(
+            "rounded-lg border p-3 space-y-3 transition-colors",
+            isRecurring ? "border-primary/50 bg-primary/5" : "border-border bg-muted/20"
+          )}>
+            <button
+              type="button"
+              onClick={() => setIsRecurring(v => !v)}
+              className="flex items-center gap-2 w-full text-left"
+            >
+              <Repeat2 size={14} className={isRecurring ? "text-primary" : "text-muted-foreground"} />
+              <span className={cn("text-sm font-medium", isRecurring ? "text-foreground" : "text-muted-foreground")}>
+                Repeat this event
+              </span>
+              <span className={cn(
+                "ml-auto text-xs px-2 py-0.5 rounded-full font-medium",
+                isRecurring ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              )}>
+                {isRecurring ? "ON" : "OFF"}
+              </span>
+            </button>
+
+            {isRecurring && (
+              <div className="space-y-3 pt-1">
+                {/* Frequency */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">Frequency</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {(["weekly", "biweekly", "monthly"] as const).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setRecurrenceRule(opt)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-md border text-sm font-medium transition-all",
+                          recurrenceRule === opt
+                            ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/40"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                        )}
+                      >
+                        {opt === "weekly" ? "Every Week" : opt === "biweekly" ? "Every 2 Weeks" : "Every Month"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* End date */}
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                    Repeat Until
+                  </label>
+                  <input
+                    type="date"
+                    value={recurrenceEnd}
+                    onChange={e => setRecurrenceEnd(e.target.value)}
+                    min={form.watch("eventDate") || today}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  {recurrenceEnd && form.watch("eventDate") && (() => {
+                    const start = new Date(form.watch("eventDate") + "T12:00:00");
+                    const end   = new Date(recurrenceEnd + "T12:00:00");
+                    const diffDays = (end.getTime() - start.getTime()) / 86400000;
+                    const count = recurrenceRule === "weekly" ? Math.floor(diffDays / 7) + 1
+                      : recurrenceRule === "biweekly" ? Math.floor(diffDays / 14) + 1
+                      : Math.floor(diffDays / 30) + 1;
+                    return count > 0 ? (
+                      <p className="text-xs text-primary mt-1">{Math.min(count, 104)} occurrences will be created</p>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Location */}

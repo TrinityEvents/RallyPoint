@@ -66,7 +66,11 @@ sqlite.exec(`
 `);
 
 // ── Migrations: add columns to existing DB if missing ──────────────────────
-try { sqlite.exec(`ALTER TABLE events ADD COLUMN sales_notes TEXT`); } catch { /* column already exists */ }
+try { sqlite.exec(`ALTER TABLE events ADD COLUMN sales_notes TEXT`); } catch { /* already exists */ }
+try { sqlite.exec(`ALTER TABLE events ADD COLUMN recurrence_rule TEXT`); } catch { /* already exists */ }
+try { sqlite.exec(`ALTER TABLE events ADD COLUMN recurrence_end TEXT`); } catch { /* already exists */ }
+try { sqlite.exec(`ALTER TABLE events ADD COLUMN series_id TEXT`); } catch { /* already exists */ }
+try { sqlite.exec(`ALTER TABLE events ADD COLUMN series_index INTEGER`); } catch { /* already exists */ }
 
 export interface IStorage {
   getAllEvents(): Event[];
@@ -75,6 +79,11 @@ export interface IStorage {
   createEvent(data: InsertEvent): Event;
   updateEvent(id: number, data: Partial<InsertEvent>): Event | undefined;
   deleteEvent(id: number): boolean;
+  // Recurring series
+  createEventBatch(rows: InsertEvent[]): Event[];
+  getEventsBySeriesId(seriesId: string): Event[];
+  updateEventsBySeries(seriesId: string, fromIndex: number, data: Partial<InsertEvent>): void;
+  deleteEventsBySeries(seriesId: string, fromIndex: number): void;
   // Contacts
   getAllContacts(): (Contact & { eventTitle: string; eventType: string; eventDate: string | null })[]; 
   getContactsByEvent(eventId: number): Contact[];
@@ -122,6 +131,50 @@ export const storage: IStorage = {
   deleteEvent(id: number): boolean {
     const result = db.delete(events).where(eq(events.id, id)).run();
     return result.changes > 0;
+  },
+
+  // ── Recurring series helpers ─────────────────────────────────────────
+  createEventBatch(rows: InsertEvent[]): Event[] {
+    const now = new Date().toISOString();
+    const insert = db.insert(events).values(
+      rows.map(r => ({ ...r, createdAt: now, updatedAt: now }))
+    ).returning();
+    return insert.all();
+  },
+
+  getEventsBySeriesId(seriesId: string): Event[] {
+    return sqlite.prepare(
+      `SELECT * FROM events WHERE series_id = ? ORDER BY series_index ASC`
+    ).all(seriesId) as Event[];
+  },
+
+  updateEventsBySeries(seriesId: string, fromIndex: number, data: Partial<InsertEvent>): void {
+    // Build SET clause dynamically from data keys
+    const now = new Date().toISOString();
+    const colMap: Record<string, string> = {
+      title: 'title', eventType: 'event_type', startTime: 'start_time',
+      endTime: 'end_time', location: 'location', notes: 'notes',
+      salesNotes: 'sales_notes', attending: 'attending', addedBy: 'added_by',
+      status: 'status', reminderMinutes: 'reminder_minutes',
+    };
+    const setClauses: string[] = ['updated_at = ?'];
+    const vals: unknown[] = [now];
+    for (const [key, col] of Object.entries(colMap)) {
+      if (key in data) {
+        setClauses.push(`${col} = ?`);
+        vals.push((data as Record<string, unknown>)[key] ?? null);
+      }
+    }
+    vals.push(seriesId, fromIndex);
+    sqlite.prepare(
+      `UPDATE events SET ${setClauses.join(', ')} WHERE series_id = ? AND series_index >= ?`
+    ).run(...vals);
+  },
+
+  deleteEventsBySeries(seriesId: string, fromIndex: number): void {
+    sqlite.prepare(
+      `DELETE FROM events WHERE series_id = ? AND series_index >= ?`
+    ).run(seriesId, fromIndex);
   },
 
   // ── Contacts ─────────────────────────────────────────────────────

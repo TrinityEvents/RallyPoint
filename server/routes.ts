@@ -3,6 +3,28 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { insertEventSchema, insertContactSchema } from "@shared/schema";
 import { z } from "zod";
+import { randomUUID } from "crypto";
+
+// ── Recurrence date generator ──────────────────────────────────────────────
+function generateRecurrenceDates(
+  startDate: string,   // YYYY-MM-DD
+  rule: string,        // "weekly" | "biweekly" | "monthly"
+  endDate: string      // YYYY-MM-DD (inclusive)
+): string[] {
+  const dates: string[] = [];
+  const current = new Date(startDate + "T12:00:00");
+  const end     = new Date(endDate   + "T12:00:00");
+  let idx = 0;
+  while (current <= end && idx < 104) { // cap at 104 occurrences (2 years weekly)
+    dates.push(current.toISOString().split("T")[0]);
+    if (rule === "weekly")   current.setDate(current.getDate() + 7);
+    else if (rule === "biweekly") current.setDate(current.getDate() + 14);
+    else if (rule === "monthly") current.setMonth(current.getMonth() + 1);
+    else break;
+    idx++;
+  }
+  return dates;
+}
 import * as cheerio from "cheerio";
 import https from "https";
 import http from "http";
@@ -491,16 +513,46 @@ export function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // POST /api/events — create new event
+  // POST /api/events — create new event (supports recurring series)
   app.post("/api/events", async (req, res) => {
     try {
       const parsed = insertEventSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
       }
-      const event = storage.createEvent(parsed.data);
+      const data = parsed.data;
+
+      // ── Recurring: generate all instances ─────────────────────────────────
+      if (data.recurrenceRule && data.recurrenceEnd) {
+        const dates = generateRecurrenceDates(data.eventDate, data.recurrenceRule, data.recurrenceEnd);
+        if (dates.length === 0) {
+          return res.status(400).json({ error: "No occurrences generated for that date range" });
+        }
+        const seriesId = randomUUID();
+        const rows = dates.map((d, i) => ({
+          ...data,
+          eventDate: d,
+          seriesId,
+          seriesIndex: i,
+        }));
+        const created = storage.createEventBatch(rows);
+        res.status(201).json(created); // returns array
+        // Notify for first event only
+        sendNewEventNotification(created[0]).catch((err) =>
+          console.error("[notify] Email failed:", err?.message)
+        );
+        sendPushToAll({
+          title: `New Recurring Event: ${created[0].title}`,
+          body:  `${dates.length} occurrences starting ${created[0].eventDate}`,
+          url:   "/",
+          tag:   `series-${seriesId}`,
+        }).catch((err) => console.error("[push] Failed:", err?.message));
+        return;
+      }
+
+      // ── Single event (existing behaviour) ──────────────────────────────
+      const event = storage.createEvent(data);
       res.status(201).json(event);
-      // Fire-and-forget: email + push notification
       sendNewEventNotification(event).catch((err) =>
         console.error("[notify] Email failed:", err?.message)
       );
@@ -516,19 +568,48 @@ export function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // PATCH /api/events/:id — update event
+  // Optional body fields: scope = "this" | "future" | "all"
   app.patch("/api/events/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const scope: string = req.body.scope || "this";
+      const { scope: _s, ...rest } = req.body;
       const updateSchema = insertEventSchema.partial();
-      const parsed = updateSchema.safeParse(req.body);
+      const parsed = updateSchema.safeParse(rest);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
       }
+
+      // Series-wide update
+      if (scope !== "this") {
+        const existing = storage.getEventById(id);
+        if (!existing) return res.status(404).json({ error: "Event not found" });
+        if (existing.seriesId && existing.seriesIndex != null) {
+          const fromIndex = scope === "future" ? existing.seriesIndex : 0;
+          storage.updateEventsBySeries(existing.seriesId, fromIndex, parsed.data);
+          res.json({ ok: true, scope, seriesId: existing.seriesId });
+          return;
+        }
+      }
+
+      // Single-event update
       const updated = storage.updateEvent(id, parsed.data);
       if (!updated) return res.status(404).json({ error: "Event not found" });
       res.json(updated);
     } catch (err) {
       res.status(500).json({ error: "Failed to update event" });
+    }
+  });
+
+  // GET /api/events/:id/series — return all events in the same series
+  app.get("/api/events/:id/series", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const event = storage.getEventById(id);
+      if (!event || !event.seriesId) return res.json([]);
+      res.json(storage.getEventsBySeriesId(event.seriesId));
+    } catch (err) {
+      res.status(500).json({ error: "Failed to fetch series" });
     }
   });
 
@@ -659,9 +740,23 @@ export function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // DELETE /api/events/:id
+  // Optional query: ?scope=this|future|all
   app.delete("/api/events/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      const scope = (req.query.scope as string) || "this";
+
+      if (scope !== "this") {
+        const event = storage.getEventById(id);
+        if (!event) return res.status(404).json({ error: "Event not found" });
+        if (event.seriesId && event.seriesIndex != null) {
+          const fromIndex = scope === "future" ? event.seriesIndex : 0;
+          storage.deleteEventsBySeries(event.seriesId, fromIndex);
+          res.json({ success: true, scope, deleted: "series" });
+          return;
+        }
+      }
+
       const deleted = storage.deleteEvent(id);
       if (!deleted) return res.status(404).json({ error: "Event not found" });
       res.json({ success: true });

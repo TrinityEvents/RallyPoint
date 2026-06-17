@@ -39,7 +39,13 @@ export const events = sqliteTable("events", {
   graphEventId: text("graph_event_id"), // reserved for future Graph sync
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+  // Recurrence
+  recurrenceRule: text("recurrence_rule"),   // "weekly" | "biweekly" | "monthly" | null
+  recurrenceEnd: text("recurrence_end"),     // YYYY-MM-DD — last date to generate instances
+  seriesId: text("series_id"),               // UUID shared by all events in a series
+  seriesIndex: integer("series_index"),      // 0-based position within the series
 });
+
 
 export const insertEventSchema = createInsertSchema(events).omit({
   id: true,

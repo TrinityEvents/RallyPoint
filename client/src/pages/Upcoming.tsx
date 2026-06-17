@@ -23,7 +23,7 @@ import {
   CalendarDays, MapPin, Link2, User, Clock, ExternalLink,
   Pencil, Trash2, Plus, Filter, CheckCircle2, XCircle, Clock3, RotateCcw,
   LayoutList, CalendarRange, ChevronLeft, ChevronRight, NotebookPen, CalendarPlus, Download,
-  Expand, X, Save
+  Expand, X, Save, Repeat2
 } from "lucide-react";
 
 // ─── Utility ────────────────────────────────────────────────────────────────
@@ -182,6 +182,8 @@ function EventDetailSheet({
   const [attending, setAttending] = useState(event.attending);
   const [status, setStatus] = useState(event.status);
   const [eventDate, setEventDate] = useState(event.eventDate);
+  const [scopePrompt, setScopePrompt] = useState<"edit" | "delete" | null>(null);
+  const isSeries = !!(event as any).seriesId;
 
   const ATTENDING_COLORS: Record<string, string> = {
     "Ryan":      "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-600",
@@ -191,16 +193,29 @@ function EventDetailSheet({
   };
 
   const updateMutation = useMutation({
-    mutationFn: (data: { notes: string; salesNotes: string; attending: string; status: string; eventDate: string }) =>
+    mutationFn: (data: { notes: string; salesNotes: string; attending: string; status: string; eventDate: string; scope?: string }) =>
       apiRequest("PATCH", `/api/events/${event.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       queryClient.invalidateQueries({ queryKey: ["/api/events/upcoming"] });
       toast({ title: "Event updated" });
       setEditMode(false);
+      setScopePrompt(null);
     },
     onError: () => toast({ title: "Error", description: "Could not update event.", variant: "destructive" }),
   });
+
+  function handleSaveClick() {
+    if (isSeries) {
+      setScopePrompt("edit");
+    } else {
+      updateMutation.mutate({ notes, salesNotes, attending, status, eventDate });
+    }
+  }
+
+  function doSave(scope: string) {
+    updateMutation.mutate({ notes, salesNotes, attending, status, eventDate, scope });
+  }
 
   const typeColor = EVENT_TYPE_COLORS[event.eventType as keyof typeof EVENT_TYPE_COLORS] ?? "#64748B";
 
@@ -251,6 +266,11 @@ function EventDetailSheet({
                 <span className={cn("inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium", attendingBadgeClass(event.attending))}>
                   {event.attending}
                 </span>
+                {isSeries && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                    <Repeat2 size={9} /> Recurring
+                  </span>
+                )}
               </div>
 
               {/* Title — max-width prevents wide-screen sprawl */}
@@ -489,7 +509,7 @@ function EventDetailSheet({
                 <Button
                   size="sm"
                   className="h-8 text-xs"
-                  onClick={() => updateMutation.mutate({ notes, salesNotes, attending, status, eventDate })}
+                  onClick={handleSaveClick}
                   disabled={updateMutation.isPending}
                   data-testid="btn-save-edit"
                 >
@@ -505,6 +525,31 @@ function EventDetailSheet({
 
         </div>
       </SheetContent>
+
+      {/* ── Scope prompt: Edit this event or all future? ── */}
+      <AlertDialog open={scopePrompt === "edit"} onOpenChange={o => { if (!o) setScopePrompt(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Repeat2 size={16} className="text-primary" /> Edit recurring event
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This event is part of a series. Which events should be updated?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={() => setScopePrompt(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => doSave("this")}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >Just this event</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => doSave("future")}
+              className="bg-primary text-primary-foreground"
+            >This &amp; all future</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }
@@ -516,11 +561,14 @@ function EventCard({ event }: { event: Event }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [deleteScope, setDeleteScope] = useState<"this" | "future" | "all" | null>(null);
 
   const days = daysUntil(event.eventDate);
+  const isSeries = !!(event as any).seriesId;
 
   const deleteMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", `/api/events/${event.id}`),
+    mutationFn: (scope: string = "this") =>
+      apiRequest("DELETE", `/api/events/${event.id}?scope=${scope}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       queryClient.invalidateQueries({ queryKey: ["/api/events/upcoming"] });
@@ -551,6 +599,11 @@ function EventCard({ event }: { event: Event }) {
               <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium", statusBadgeClass(event.status))}>
                 <StatusIcon status={event.status} />
                 {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
+              </span>
+            )}
+            {isSeries && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-700">
+                <Repeat2 size={10} /> Recurring
               </span>
             )}
           </div>
@@ -685,7 +738,8 @@ function EventCard({ event }: { event: Event }) {
 
       {editing && <EventDetailSheet event={event} open={editing} onClose={() => setEditing(false)} />}
 
-      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+      {/* Single-event delete confirm */}
+      <AlertDialog open={confirming && !isSeries} onOpenChange={v => { if (!v) setConfirming(false); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this event?</AlertDialogTitle>
@@ -696,12 +750,41 @@ function EventCard({ event }: { event: Event }) {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep it</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteMutation.mutate()}
+              onClick={() => { deleteMutation.mutate("this"); setConfirming(false); }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid={`confirm-delete-${event.id}`}
             >
               Remove
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Recurring-series delete scope picker */}
+      <AlertDialog open={confirming && isSeries} onOpenChange={v => { if (!v) setConfirming(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Repeat2 size={16} className="text-destructive" /> Remove recurring event
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This event repeats. What would you like to remove?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { deleteMutation.mutate("this"); setConfirming(false); }}
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >Just this one</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => { deleteMutation.mutate("future"); setConfirming(false); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >This &amp; all future</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => { deleteMutation.mutate("all"); setConfirming(false); }}
+              className="bg-destructive/80 text-destructive-foreground hover:bg-destructive"
+            >Entire series</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
